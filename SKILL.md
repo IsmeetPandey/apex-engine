@@ -3,9 +3,9 @@ name: apex-engine
 description: Use when executing software engineering tasks, writing code, debugging, refactoring, or managing complex projects with lightweight or compact AI models (e.g. Gemini Flash, Claude Haiku, GPT-4o-mini) to enforce flagship code quality, contract-driven verification, and lossless memory persistence across long conversations.
 ---
 
-# ApexEngine: Cognitive Protocol for Compact & Flash Models
+# ApexEngine: The Flagship Quality & Infinite Memory Skill
 
-ApexEngine is a deterministic cognitive harness that transforms lightweight, fast-tier AI models into rigorous, senior-grade software engineers. While compact models possess exceptional token-generation speed and low per-turn latency, their unconstrained execution is prone to horizon amnesia, speculative hallucinations, skipped testing, and premature completion declarations. ApexEngine eliminates these vulnerabilities by bounding the model within a deterministic 4-gate state machine and a perpetual, zero-decay active memory buffer.
+ApexEngine is the ultimate open-source skill that transforms lightweight, fast-tier AI models (Gemini Flash, Claude Haiku, GPT-4o-mini) into rigorous, senior-grade software engineers. While compact models possess exceptional token-generation speed and low per-turn latency, their unconstrained execution is prone to horizon amnesia, speculative hallucinations, skipped testing, and premature completion declarations. ApexEngine eliminates these vulnerabilities by bounding the model within a deterministic 4-gate state machine and a perpetual, zero-decay active memory buffer.
 
 ---
 
@@ -292,7 +292,7 @@ When any of the following triggers occur, the agent must **STOP IMMEDIATELY** an
 
 ## 6. Adaptive Teamwork & Subagent Swarm Protocol
 
-ApexEngine adapts dynamically depending on whether it is running within a multi-agent orchestration harness (e.g., Google Antigravity) or as a standalone single-agent CLI (e.g., Claude Code, Cursor, Codex).
+ApexEngine adapts dynamically depending on whether it is running within a multi-agent environment (e.g., Google Antigravity) or as a standalone single-agent CLI (e.g., Claude Code, Cursor, Codex).
 
 ### Mode A: Multi-Agent Swarm Protocol (Antigravity Orchestration)
 
