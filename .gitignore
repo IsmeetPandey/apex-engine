@@ -23,3 +23,5 @@ wheels/
 .coverage
 htmlcov/
 .context/
+benchmarks/results.json
+*.wal

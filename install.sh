@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "=================================================="
-echo "          Installing ApexEngine v1.1.0            "
+echo "          Installing ApexEngine v2.1.0            "
 echo "=================================================="
 
 # Check Python 3

@@ -278,8 +278,7 @@ apex-engine/
 ├── benchmarks/
 │   ├── benchmark_head_to_head.py     # 50-turn agentic comparative benchmark
 │   ├── benchmark_memory.py           # 10-100 turn context compression benchmark
-│   ├── run_all.py                    # Unified benchmark runner
-│   └── results.json                  # Machine-readable benchmark telemetry
+│   └── run_all.py                    # Unified benchmark runner
 ├── scripts/
 │   ├── apex_cli.py                   # Master unified CLI entrypoint (apex)
 │   ├── condense.py                   # Context distillation & snapshot engine
@@ -300,7 +299,6 @@ apex-engine/
 │   ├── test_apex_cli.py
 │   ├── test_benchmarks.py
 │   ├── test_condenser.py
-│   ├── test_context_condenser.py
 │   ├── test_dep_guard.py
 │   ├── test_e2e_simulation.py
 │   ├── test_gatekeeper.py

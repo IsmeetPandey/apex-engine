@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "          Installing ApexEngine v1.1.0            " -ForegroundColor Cyan
+Write-Host "          Installing ApexEngine v2.1.0            " -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 
 # Check Python
