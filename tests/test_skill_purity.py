@@ -15,11 +15,6 @@ import re
 import textwrap
 import unittest
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
-
 
 class TestSkillPurity(unittest.TestCase):
     @classmethod
@@ -64,17 +59,14 @@ class TestSkillPurity(unittest.TestCase):
         raw_fm = parts[1]
 
         data = {}
-        if yaml is not None:
-            data = yaml.safe_load(raw_fm) or {}
-        else:
-            # Fallback parser for standard simple YAML frontmatter
-            for line in raw_fm.splitlines():
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if ":" in line:
-                    key, val = line.split(":", 1)
-                    data[key.strip()] = val.strip()
+        # Pure stdlib parser for standard simple YAML frontmatter
+        for line in raw_fm.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if ":" in line:
+                key, val = line.split(":", 1)
+                data[key.strip()] = val.strip()
 
         return raw_fm, data
 

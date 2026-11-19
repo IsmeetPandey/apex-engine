@@ -9,6 +9,7 @@ Zero external dependencies: Python 3.8+ standard library only.
 import os
 import sys
 import argparse
+import subprocess
 
 # Add scripts directory to sys.path
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -100,6 +101,10 @@ def main(argv=None) -> int:
     status_parser = subparsers.add_parser("status", help="Print active_state.md buffer to stdout")
     status_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
 
+    # 12. benchmark: Empirical Benchmark Suite
+    bench_parser = subparsers.add_parser("benchmark", help="Run empirical memory and head-to-head benchmarks")
+    bench_parser.add_argument("--memory-only", action="store_true", help="Run only memory context benchmark")
+
     args = parser.parse_args(argv)
 
     if args.subcommand == "vibe":
@@ -141,6 +146,14 @@ def main(argv=None) -> int:
 
     elif args.subcommand == "studio":
         return studio.main(["--port", str(args.port), "--dir", args.dir])
+
+    elif args.subcommand == "benchmark":
+        benchmarks_dir = os.path.abspath(os.path.join(SCRIPTS_DIR, "..", "benchmarks"))
+        if args.memory_only:
+            script = os.path.join(benchmarks_dir, "benchmark_memory.py")
+        else:
+            script = os.path.join(benchmarks_dir, "run_all.py")
+        return subprocess.run([sys.executable, script]).returncode
 
     return 0
 
