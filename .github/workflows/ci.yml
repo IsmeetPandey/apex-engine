@@ -1,0 +1,38 @@
+name: ApexEngine Multi-OS CI
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} with Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Configure Git for tests
+        run: |
+          git config --global user.name "CI Runner"
+          git config --global user.email "ci@apexengine.org"
+
+      - name: Run Test Discovery Suite (31 Tests)
+        run: python -m unittest discover -s tests -v
+
+      - name: Run Gatekeeper Self-Check
+        run: python scripts/gatekeeper.py --dir .

@@ -209,6 +209,31 @@ Dumps the current active state buffer to stdout:
 python skills/apex-engine/scripts/condense.py status [--dir <project-root>]
 ```
 
+#### 5. Compress Epoch Snapshot (`snapshot`)
+Creates a permanent compressed zip archive of active state, git diff patch, and epoch metadata in `.context/snapshots/`:
+```bash
+python skills/apex-engine/scripts/condense.py snapshot \
+  --dir . \
+  --msg "Completed and tested core auth module"
+```
+
+#### 6. Retrieve Past Knowledge (`query`)
+Searches past epochs and snapshots for historical context without loading raw transcripts:
+```bash
+python skills/apex-engine/scripts/condense.py query \
+  --dir . \
+  --keyword "rate limiter"
+```
+
+#### 7. Gatekeeper Pre-Commit Verification (`gatekeeper.py`)
+Scans modified files for forbidden placeholders (`TODO`, `FIXME`, bare `pass`), tests presence, and validates context buffer size:
+```bash
+python skills/apex-engine/scripts/gatekeeper.py --dir .
+
+# Or install as git pre-commit hook:
+python skills/apex-engine/scripts/gatekeeper.py --install-hook
+```
+
 ---
 
 ### Zero-Dependency Markdown Fallback

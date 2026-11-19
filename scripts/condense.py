@@ -7,13 +7,15 @@ Zero external dependencies: Python 3.8+ standard library only.
 import os
 import sys
 import re
+import json
 import shutil
+import zipfile
 import tempfile
 import argparse
 import datetime
 import subprocess
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List, Dict
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -68,7 +70,7 @@ def get_short_commit(target_dir: str) -> str:
         if proc.returncode == 0 and proc.stdout.strip():
             return proc.stdout.strip()
     except Exception:
-        pass
+        return "N/A"
     return "N/A"
 
 
@@ -241,11 +243,26 @@ def update_active_state(
         if os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)
-            except OSError:
-                pass
+            except OSError as cleanup_err:
+                sys.stderr.write(f"Warning: could not unlink {temp_path}: {cleanup_err}\n")
         raise
 
     return content
+
+
+def get_next_epoch_number(history_file: str) -> int:
+    """Calculates next monotonic epoch number from history.log."""
+    if not os.path.isfile(history_file):
+        return 1
+    try:
+        with open(history_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        matches = re.findall(r"^## Epoch \[(\d+)\]", content, flags=re.MULTILINE)
+        if matches:
+            return max(int(m) for m in matches) + 1
+    except Exception:
+        return 1
+    return 1
 
 
 def checkpoint(target_dir: str, msg: str, status: str = "COMPLETED") -> str:
@@ -254,18 +271,7 @@ def checkpoint(target_dir: str, msg: str, status: str = "COMPLETED") -> str:
     os.makedirs(context_dir, exist_ok=True)
     history_file = os.path.join(context_dir, "history.log")
 
-    if os.path.isfile(history_file):
-        with open(history_file, "r", encoding="utf-8") as f:
-            content = f.read()
-    else:
-        content = FALLBACK_EPOCH_LOG
-
-    matches = re.findall(r"^## Epoch \[(\d+)\]", content, flags=re.MULTILINE)
-    if matches:
-        epoch_idx = max(int(m) for m in matches) + 1
-    else:
-        epoch_idx = 1
-
+    epoch_idx = get_next_epoch_number(history_file)
     epoch_str = f"{epoch_idx:03d}"
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     commit_hash = get_short_commit(target_dir)
@@ -293,6 +299,101 @@ def get_status(target_dir: str) -> Tuple[str, bool]:
         return (f"Error: active_state.md not found in {os.path.join(target_dir, '.context')}", False)
     with open(state_file, "r", encoding="utf-8") as f:
         return (f.read(), True)
+
+
+def create_snapshot(target_dir: str, msg: str = "") -> str:
+    """Creates a compressed zip archive of current active state, diffs, and metadata."""
+    context_dir = os.path.join(target_dir, ".context")
+    snapshots_dir = os.path.join(context_dir, "snapshots")
+    os.makedirs(snapshots_dir, exist_ok=True)
+
+    history_file = os.path.join(context_dir, "history.log")
+    next_epoch = get_next_epoch_number(history_file)
+    epoch_str = f"{next_epoch:03d}"
+    now = datetime.datetime.now(datetime.timezone.utc)
+    ts_label = now.strftime("%Y%m%dT%H%M%SZ")
+    zip_name = f"snapshot_epoch_{epoch_str}_{ts_label}.zip"
+    zip_path = os.path.join(snapshots_dir, zip_name)
+
+    active_state_path = os.path.join(context_dir, "active_state.md")
+    active_content = ""
+    if os.path.isfile(active_state_path):
+        with open(active_state_path, "r", encoding="utf-8") as f:
+            active_content = f.read()
+
+    # Capture patch
+    diff_patch = ""
+    try:
+        proc = subprocess.run(
+            ["git", "diff", "HEAD"],
+            cwd=target_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=5
+        )
+        if proc.returncode == 0:
+            diff_patch = proc.stdout
+    except Exception:
+        diff_patch = ""
+
+    meta = {
+        "epoch": next_epoch,
+        "timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "commit": get_short_commit(target_dir),
+        "message": msg or "Epoch milestone snapshot",
+        "has_active_state": bool(active_content),
+        "patch_bytes": len(diff_patch.encode("utf-8"))
+    }
+
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        if active_content:
+            zf.writestr("active_state.md", active_content)
+        if diff_patch:
+            zf.writestr("git_diff.patch", diff_patch)
+        zf.writestr("snapshot_meta.json", json.dumps(meta, indent=2))
+        if os.path.isfile(history_file):
+            zf.write(history_file, arcname="history.log")
+
+    return zip_path
+
+
+def query_history(target_dir: str, keyword: str) -> Tuple[str, bool]:
+    """Searches history.log and snapshots for milestones matching keyword."""
+    context_dir = os.path.join(target_dir, ".context")
+    history_file = os.path.join(context_dir, "history.log")
+    if not os.path.isfile(history_file):
+        return ("No history.log found in context.", False)
+
+    with open(history_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    epochs = re.split(r"\n(?=## Epoch \[)", content)
+    matches = [ep.strip() for ep in epochs if keyword.lower() in ep.lower() and ep.strip()]
+
+    if not matches:
+        return (f"No milestones found matching '{keyword}'.", False)
+
+    snapshots_dir = os.path.join(context_dir, "snapshots")
+    available_zips = []
+    if os.path.isdir(snapshots_dir):
+        available_zips = [f for f in os.listdir(snapshots_dir) if f.endswith(".zip")]
+
+    out = [f"=== Found {len(matches)} matching milestone(s) for '{keyword}' ===\n"]
+    for m in matches:
+        out.append(m)
+        out.append("")
+
+    if available_zips:
+        out.append(f"Available Compressed Snapshots ({len(available_zips)}):")
+        for z in available_zips[:5]:
+            out.append(f"  - .context/snapshots/{z}")
+        if len(available_zips) > 5:
+            out.append(f"  ... and {len(available_zips) - 5} more.")
+
+    return ("\n".join(out), True)
 
 
 def main(argv=None) -> int:
@@ -325,6 +426,16 @@ def main(argv=None) -> int:
     cp_parser.add_argument("--msg", required=True, help="Checkpoint summary message")
     cp_parser.add_argument("--status", default="COMPLETED", help="Epoch status (default: COMPLETED)")
 
+    # snapshot
+    snap_parser = subparsers.add_parser("snapshot", help="Create a compressed zip snapshot of current epoch")
+    snap_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
+    snap_parser.add_argument("--msg", default="", help="Snapshot description or milestone summary")
+
+    # query
+    query_parser = subparsers.add_parser("query", help="Query past milestones and snapshots by keyword")
+    query_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
+    query_parser.add_argument("--keyword", required=True, help="Keyword to search in past epochs")
+
     # status
     status_parser = subparsers.add_parser("status", help="Print active_state.md to stdout")
     status_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
@@ -353,6 +464,18 @@ def main(argv=None) -> int:
         checkpoint(target_dir, msg=args.msg, status=args.status)
         print(f"Logged checkpoint in {target_dir}")
         return 0
+    elif args.command == "snapshot":
+        path = create_snapshot(target_dir, msg=args.msg)
+        print(f"Created snapshot: {path}")
+        return 0
+    elif args.command == "query":
+        res, ok = query_history(target_dir, args.keyword)
+        if ok:
+            print(res)
+            return 0
+        else:
+            print(res, file=sys.stderr)
+            return 1
     elif args.command == "status":
         output, ok = get_status(target_dir)
         if ok:
