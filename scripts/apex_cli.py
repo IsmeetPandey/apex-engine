@@ -101,7 +101,12 @@ def main(argv=None) -> int:
     status_parser = subparsers.add_parser("status", help="Print active_state.md buffer to stdout")
     status_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
 
-    # 12. benchmark: Empirical Benchmark Suite
+    # 12. step: Rapid Active Memory Step
+    step_parser = subparsers.add_parser("step", help="Quick one-line active memory progress update")
+    step_parser.add_argument("message", help="Brief progress and immediate next step")
+    step_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
+
+    # 13. benchmark: Empirical Benchmark Suite
     bench_parser = subparsers.add_parser("benchmark", help="Run empirical memory and head-to-head benchmarks")
     bench_parser.add_argument("--memory-only", action="store_true", help="Run only memory context benchmark")
 
@@ -117,7 +122,7 @@ def main(argv=None) -> int:
             sub_argv.append("--json")
         return vibe_synthesizer.main(sub_argv)
 
-    elif args.subcommand in {"init", "update", "checkpoint", "snapshot", "query", "status"}:
+    elif args.subcommand in {"init", "update", "checkpoint", "snapshot", "query", "status", "step"}:
         return condense.main(argv)
 
     elif args.subcommand == "gate":

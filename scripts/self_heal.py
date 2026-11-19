@@ -16,32 +16,61 @@ from typing import Dict, Any, Optional
 
 
 def parse_error_log(error_text: str) -> Dict[str, Any]:
-    """Extracts failing file, line, exception type, and message from error logs."""
-    # Pattern 1: Python traceback "File '...', line X, in ..."
-    file_matches = list(re.finditer(r'File\s+["\']([^"\']+)["\'],\s+line\s+(\d+)(?:,\s+in\s+([^\n]+))?', error_text))
+    """Extracts failing file, line, exception type, and message from error logs across Python, TS/JS, Go, and Rust."""
     failing_file = "unknown"
     line_no = 0
     function_name = ""
-
-    if file_matches:
-        # Last frame is usually the culprit in Python tracebacks
-        last_match = file_matches[-1]
-        failing_file = last_match.group(1)
-        line_no = int(last_match.group(2))
-        function_name = last_match.group(3) or ""
-
-    # Pattern 2: Error class and message
     error_type = "RuntimeError"
     error_msg = ""
-    err_match = re.search(r'([A-Za-z0-9_]+(?:Error|Exception|Failure)):\s*([^\n]+)', error_text)
-    if err_match:
-        error_type = err_match.group(1)
-        error_msg = err_match.group(2).strip()
-    else:
-        # Check for pytest FAILURES block
-        fail_match = re.search(r'FAILED\s+([^\s:]+)::([^\s]+)\s*-\s*([^\n]+)', error_text)
+
+    # Check 1: TypeScript / JavaScript tsc error: "src/App.tsx(14,5): error TS2322: ..." or "src/App.tsx:14:5 - error TS2322: ..."
+    ts_match = re.search(r'([a-zA-Z0-9_\-\./\\]+\.(?:ts|tsx|js|jsx))(?:\((\d+),\d+\)|:(\d+):\d+)\s*(?:-\s*error\s*|:\s*error\s*)(TS\d+)?:?\s*([^\n]+)', error_text)
+    if ts_match:
+        failing_file = ts_match.group(1)
+        line_no = int(ts_match.group(2) or ts_match.group(3))
+        error_type = ts_match.group(4) or "TypeScriptError"
+        error_msg = ts_match.group(5).strip()
+
+    # Check 2: Rust rustc/cargo error: "error[E0425]: ... --> src/main.rs:18:5"
+    elif "-->" in error_text and ".rs:" in error_text:
+        rs_loc_match = re.search(r'-->\s*([a-zA-Z0-9_\-\./\\]+\.rs):(\d+):(\d+)', error_text)
+        rs_err_match = re.search(r'error(?:\[(E\d+)\])?:\s*([^\n]+)', error_text)
+        if rs_loc_match:
+            failing_file = rs_loc_match.group(1)
+            line_no = int(rs_loc_match.group(2))
+        if rs_err_match:
+            error_type = rs_err_match.group(1) or "RustcError"
+            error_msg = rs_err_match.group(2).strip()
+
+    # Check 3: Go build/test error: "main.go:14:2: undefined: myFunction"
+    elif re.search(r'([a-zA-Z0-9_\-\./\\]+\.go):(\d+):(?:\d+:)?\s*(.+)', error_text):
+        go_match = re.search(r'([a-zA-Z0-9_\-\./\\]+\.go):(\d+):(?:\d+:)?\s*(.+)', error_text)
+        if go_match:
+            failing_file = go_match.group(1)
+            line_no = int(go_match.group(2))
+            error_type = "GoCompilerError"
+            error_msg = go_match.group(3).strip()
+
+    # Check 4: Python traceback "File '...', line X, in ..."
+    elif re.search(r'File\s+["\']([^"\']+)["\'],\s+line\s+(\d+)', error_text):
+        file_matches = list(re.finditer(r'File\s+["\']([^"\']+)["\'],\s+line\s+(\d+)(?:,\s+in\s+([^\n]+))?', error_text))
+        if file_matches:
+            last_match = file_matches[-1]
+            failing_file = last_match.group(1)
+            line_no = int(last_match.group(2))
+            function_name = last_match.group(3) or ""
+
+        err_match = re.search(r'([A-Za-z0-9_]+(?:Error|Exception|Failure)):\s*([^\n]+)', error_text)
+        if err_match:
+            error_type = err_match.group(1)
+            error_msg = err_match.group(2).strip()
+
+    # Check 5: Pytest FAILURES block
+    elif "FAILURES" in error_text or "FAILED" in error_text:
+        fail_match = re.search(r'FAILED\s+([^\s:]+)(?:::([^\s]+))?\s*-\s*([^\n]+)', error_text)
         if fail_match:
             failing_file = fail_match.group(1)
+            function_name = fail_match.group(2) or ""
             error_type = "TestFailure"
             error_msg = fail_match.group(3).strip()
 

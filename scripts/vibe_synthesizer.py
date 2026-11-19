@@ -34,7 +34,13 @@ def synthesize_spec(prompt: str) -> Dict[str, Any]:
     has_auth = any(k in prompt.lower() for k in ["auth", "jwt", "login", "user", "password", "session"])
     has_storage = any(k in prompt.lower() for k in ["storage", "db", "database", "save", "redis", "persist", "sqlite"])
     has_api = any(k in prompt.lower() for k in ["api", "endpoint", "rest", "service", "route"])
-    has_ui = any(k in prompt.lower() for k in ["ui", "editor", "view", "dashboard", "component", "frontend"])
+    has_ui = any(k in prompt.lower() for k in ["ui", "editor", "view", "dashboard", "component", "frontend", "react", "nextjs", "vue"])
+
+    # Detect language/stack
+    prompt_lower = prompt.lower()
+    is_ts = any(k in prompt_lower for k in ["typescript", "ts", "react", "next.js", "nextjs", "node", "javascript", "js", "frontend", "component"])
+    is_go = any(k in prompt_lower for k in ["go", "golang"])
+    is_rust = any(k in prompt_lower for k in ["rust", "cargo"])
 
     objectives = [
         f"Implement core logic for: {prompt.strip()}",
@@ -47,31 +53,65 @@ def synthesize_spec(prompt: str) -> Dict[str, Any]:
     if not slug:
         slug = "feature_core"
 
-    files.append({
-        "path": f"src/{slug}_service.py",
-        "responsibility": "Core domain logic and interface contract implementation."
-    })
-    files.append({
-        "path": f"tests/test_{slug}.py",
-        "responsibility": "Unit and contract test suite asserting all requirements."
-    })
+    if is_ts:
+        ext = "tsx" if has_ui else "ts"
+        files.append({
+            "path": f"src/{slug}.{ext}",
+            "responsibility": "Core TypeScript implementation and typed contract interfaces."
+        })
+        files.append({
+            "path": f"tests/{slug}.test.ts",
+            "responsibility": "Automated Vitest/Jest unit & contract test suite."
+        })
+        test_runner = "npm test"
+    elif is_go:
+        files.append({
+            "path": f"{slug}.go",
+            "responsibility": "Core Go package implementation and struct methods."
+        })
+        files.append({
+            "path": f"{slug}_test.go",
+            "responsibility": "Standard Go test suite verifying package invariants."
+        })
+        test_runner = "go test -v ./..."
+    elif is_rust:
+        files.append({
+            "path": f"src/{slug}.rs",
+            "responsibility": "Rust module implementation with strong ownership guarantees."
+        })
+        files.append({
+            "path": f"tests/test_{slug}.rs",
+            "responsibility": "Integration test suite verifying crate public interfaces."
+        })
+        test_runner = "cargo test"
+    else:
+        files.append({
+            "path": f"src/{slug}_service.py",
+            "responsibility": "Core domain logic and interface contract implementation."
+        })
+        files.append({
+            "path": f"tests/test_{slug}.py",
+            "responsibility": "Unit and contract test suite asserting all requirements."
+        })
+        test_runner = "python -m unittest discover -s tests"
 
     if has_storage:
+        ext = "ts" if is_ts else ("go" if is_go else ("rs" if is_rust else "py"))
         files.append({
-            "path": f"src/{slug}_storage.py",
+            "path": f"src/{slug}_storage.{ext}",
             "responsibility": "Data persistence layer and serialization logic."
         })
-    if has_ui:
+    if has_ui and not is_ts:
         files.append({
             "path": f"src/{slug}_ui.py",
             "responsibility": "Presentation layer, display rendering, or state dispatch."
         })
 
     test_plan = [
-        f"Step 1 (Red): Author tests/test_{slug}.py asserting primary functional requirements.",
-        "Step 2: Run test suite to verify contract failure prior to implementation.",
+        f"Step 1 (Red): Author tests verifying primary functional requirements.",
+        f"Step 2: Run test suite via '{test_runner}' to verify contract failure prior to implementation.",
         "Step 3 (Green): Implement minimal defensive logic to turn tests green.",
-        "Step 4: Run Gatekeeper self-check to ensure zero placeholders (TODO, FIXME, pass) remain."
+        "Step 4: Run Gatekeeper self-check to ensure zero incomplete placeholders remain."
     ]
 
     invariants = [

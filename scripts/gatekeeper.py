@@ -19,10 +19,16 @@ FORBIDDEN_PATTERNS = [
     (re.compile(r"^\s*pass\s*$", re.MULTILINE), "Bare 'pass' statement found"),
     (re.compile(r"^\s*\.\.\.\s*$", re.MULTILINE), "Bare '...' ellipsis placeholder found"),
     (re.compile(r"(?i)left as an exercise"), "'Left as an exercise' placeholder found"),
+    (re.compile(r"(?i)implement later"), "'Implement later' placeholder found"),
+    (re.compile(r"(?i)placeholder for"), "'Placeholder for' marker found"),
+    (re.compile(r"\btodo!\s*\("), "Rust todo!() macro placeholder found"),
+    (re.compile(r"\bunimplemented!\s*\("), "Rust unimplemented!() macro placeholder found"),
+    (re.compile(r"if\s+err\s*!=\s*nil\s*\{\s*\}"), "Go empty error handler found"),
+    (re.compile(r"\.catch\s*\(\s*(?:\(\s*\)|[a-zA-Z_]\w*)\s*=>\s*\{\s*\}"), "JavaScript/TypeScript silent swallowed promise catch found"),
 ]
 
 CODE_EXTENSIONS = {".py", ".ts", ".js", ".jsx", ".tsx", ".go", ".rs", ".java", ".cpp", ".c", ".cs"}
-TEST_PATTERNS = [re.compile(r"(?i)(test_|_test|\.test\.|\.spec\.)")]
+TEST_PATTERNS = [re.compile(r"(?i)(test_|_test|\.test\.|\.spec\.|tests/|test/|__tests__/)")]
 
 
 def get_modified_files(target_dir: str) -> List[str]:
@@ -65,7 +71,12 @@ def check_placeholders(target_dir: str, files: List[str]) -> List[str]:
     for rel_path in files:
         full_path = os.path.join(target_dir, rel_path)
         ext = os.path.splitext(rel_path)[1].lower()
+        # Skip non-code files, test suites, or gatekeeper's own rule definitions
         if ext not in CODE_EXTENSIONS or not os.path.isfile(full_path):
+            continue
+        if os.path.basename(rel_path) == "gatekeeper.py":
+            continue
+        if any(p.search(rel_path) for p in TEST_PATTERNS):
             continue
 
         try:
@@ -94,7 +105,7 @@ def check_active_state(target_dir: str) -> List[str]:
             try:
                 subprocess.run([sys.executable, init_script, "init", "--dir", target_dir], capture_output=True, timeout=5)
             except Exception:
-                pass
+                violations.append("Unable to auto-init .context directory.")
         if not os.path.isfile(state_file):
             violations.append("Missing .context/active_state.md. Run 'python scripts/condense.py init'")
             return violations
@@ -143,7 +154,7 @@ def install_pre_commit_hook(target_dir: str) -> bool:
         st = os.stat(hook_file)
         os.chmod(hook_file, st.st_mode | stat.S_IEXEC)
     except Exception:
-        pass
+        return False
 
     print(f"Installed ApexEngine pre-commit hook in {hook_file}")
     return True

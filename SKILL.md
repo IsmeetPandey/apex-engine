@@ -89,15 +89,17 @@ Every task, feature, bug fix, or refactor MUST progress sequentially through fou
 
 **Iron Rule**: Write complete, robust, production-grade code that satisfies the test contract. Zero shortcuts, zero placeholders.
 
-- **Prohibited Patterns**:
-  - `TODO`, `FIXME`, `pass`, `...`, `// Implement later`, or placeholder mocks in non-test code.
-  - Silent error suppression (`except: pass`, empty `catch {}`, swallowing return codes).
-  - Unbounded functions (> 60 lines of monolithic complexity). Split into focused, single-responsibility units.
-  - Untyped or loosely typed signatures where types are standard (use Python type hints, TypeScript interfaces, Rust/Go strong types).
+- **Prohibited Patterns (Polyglot Hard Invariants)**:
+  - **Universal**: `TODO`, `FIXME`, `// Implement later`, `'left as an exercise'`, or incomplete mocks in production files.
+  - **Python**: Bare `pass`, ellipsis `...`, silent error suppression (`except Exception: pass`).
+  - **Rust**: `todo!()`, `unimplemented!()` macros left in non-test functions.
+  - **Go**: Ignored error handling (`if err != nil { }`).
+  - **TypeScript / JavaScript**: Swallowed promises (`.catch(() => {})`), empty event callbacks, or untyped `any` escapes.
+  - **All Languages**: Unbounded monolithic functions (> 60 lines). Split into focused, single-responsibility units.
 - **Required Defensive Practices**:
   - Explicit input validation at public boundaries (type checks, null guards, range assertions).
-  - Deterministic resource cleanup (`with` context managers, `try/finally`, deferred closes).
-  - Contextual error messages that report parameters, expected vs received values, and actionable failure causes.
+  - Deterministic resource cleanup (`with` context managers, `defer`, `try/finally`).
+  - Contextual error messages reporting parameters, expected vs received values, and actionable failure causes.
 
 ---
 
@@ -194,7 +196,15 @@ python skills/apex-engine/scripts/condense.py update \
   --next "Execute pytest and verify green"
 ```
 
-#### 3. Log Milestone Checkpoint (`checkpoint`)
+#### 3. Rapid Memory Step (`step`)
+Single-command progress recording that automatically captures live git diffs and updates the immediate next action without verbose flags:
+```bash
+python skills/apex-engine/scripts/condense.py step "Completed token validator, next is session expiry"
+# Or via unified CLI:
+apex step "Completed token validator, next is session expiry"
+```
+
+#### 4. Log Milestone Checkpoint (`checkpoint`)
 Appends an immutable milestone record with current UTC timestamp and short git commit hash into `history.log`:
 ```bash
 python skills/apex-engine/scripts/condense.py checkpoint \

@@ -1,6 +1,6 @@
 # ApexEngine: Flagship Code Quality & Infinite Context for Compact AI Models
 
-[![Test Suite](https://img.shields.io/badge/tests-53%2F53%20passing-brightgreen.svg)]()
+[![Test Suite](https://img.shields.io/badge/tests-59%2F59%20passing-brightgreen.svg)]()
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)]()
 [![Dependencies](https://img.shields.io/badge/dependencies-0%20(stdlib%20only)-orange.svg)]()
@@ -18,9 +18,10 @@ Many developers attempt to fix weak AI models by installing heavy external frame
 **ApexEngine is an AI Agent Skill.**
 You simply install this skill folder into your agent (`~/.gemini/config/skills/apex-engine` or `.agents/skills/apex-engine`). The moment your agent activates the skill, its cognitive protocol is permanently elevated:
 
-1. **Deterministic 4-Gate Quality Machine**: The agent is physically barred from taking shortcuts. It cannot skip reading files, cannot skip writing tests, cannot leave `TODO` or bare `pass` placeholders, and cannot claim a task is "done" without executing tests in your terminal and getting exit code 0.
+1. **Universal Polyglot Hard Gates**: The agent is physically barred from taking shortcuts across **TypeScript, JavaScript, Go, Rust, and Python**. It cannot leave `TODO`, `FIXME`, bare `pass`, Rust `todo!()`, Go empty `if err != nil {}`, or swallowed promises. It cannot claim a task is "done" without executing tests in your terminal and getting exit code 0.
 2. **Infinite 2M-Equivalent Memory Distillation**: Instead of letting conversation context compound quadratically ($O(N^2)$) into 500k+ tokens (which degrades attention and causes amnesia), ApexEngine keeps active memory bounded under **159 tokens** (< 2,500 bytes) in `.context/active_state.md`. Finished milestones are safely archived into compressed `.context/snapshots/*.zip` and `history.log`.
-3. **Zero Dependencies**: 100% pure Python standard library. No `pip install`, no C++ build tools, no API keys, and no vendor lock-in. Works instantly across Antigravity, Claude Code, Codex, and Cursor on Windows, macOS, and Linux.
+3. **AST-Verified Dependency Guard**: Catches hallucinated packages before execution — checking Python against stdlib & requirements, TypeScript/JS against `package.json` & Node built-ins, and Go/Rust against module declarations.
+4. **Zero Dependencies**: 100% pure Python standard library. No `pip install`, no C++ build tools, no API keys, and no vendor lock-in. Works instantly across Antigravity, Claude Code, Codex, and Cursor on Windows, macOS, and Linux.
 
 ---
 
@@ -223,19 +224,22 @@ python scripts/apex_cli.py update \
   --invariants "Idempotent revocation; TTL 3600s" \
   --next "Implement endpoint handler"
 
-# 4. Check for placeholders, TODOs, and invariant breaches
+# 4. Rapid one-line memory step (< 15ms)
+python scripts/apex_cli.py step "Implemented endpoint handler, next is verification"
+
+# 5. Check for placeholders, TODOs, and invariant breaches (Polyglot)
 python scripts/apex_cli.py gate
 
-# 5. Catch hallucinated dependencies before running
+# 6. Catch hallucinated dependencies before running (Python & NPM)
 python scripts/apex_cli.py deps
 
-# 6. Parse terminal test failure and isolate root cause
+# 7. Parse terminal test failure across TypeScript, Go, Rust, or Python
 python scripts/apex_cli.py heal --error "AssertionError: Expected 200 OK, got 401" --apply
 
-# 7. Run empirical benchmarks
+# 8. Run empirical benchmarks
 python scripts/apex_cli.py benchmark
 
-# 8. Launch live dark-mode visual web HUD
+# 9. Launch live dark-mode visual web HUD
 python scripts/apex_cli.py studio --port 8765
 ```
 
@@ -245,26 +249,27 @@ python scripts/apex_cli.py studio --port 8765
 
 ApexEngine requires Python 3.8+ with **zero third-party dependencies**.
 
-Run the complete test suite (53 tests across 11 modules):
+Run the complete test suite (59 tests across 12 modules):
 ```bash
 python -m unittest discover -s tests
 ```
 ```text
-Ran 53 tests in 32.3s
+Ran 59 tests in 21.4s
 OK
 ```
 
 - `test_templates.py`: Verifies buffer byte boundaries and template structure.
 - `test_condenser.py`: Verifies CLI commands, atomic temp-file replace, and git diff capture.
 - `test_snapshot.py`: Verifies zip snapshot integrity, metadata serialization, and historical query.
-- `test_gatekeeper.py`: Verifies pre-commit gate enforcement and placeholder detection.
+- `test_gatekeeper.py`: Verifies pre-commit gate enforcement and polyglot placeholder detection.
 - `test_skill_purity.py`: Verifies frontmatter CSO trigger rules, AST code execution, and tool purity.
 - `test_e2e_simulation.py`: Simulates full 4-gate developer lifecycle in a live temporary git repo.
-- `test_vibe_synthesizer.py`: Verifies natural language decomp into contracts and active memory.
-- `test_dep_guard.py`: Verifies AST import inspection against stdlib and requirements.
-- `test_self_heal.py`: Verifies traceback parsing, error classification, and remediation.
+- `test_vibe_synthesizer.py`: Verifies natural language decomp into contracts across TS, Go, Rust, and Python.
+- `test_dep_guard.py`: Verifies AST import inspection against Python stdlib and NPM `package.json`.
+- `test_self_heal.py`: Verifies traceback parsing, error classification, and multi-language remediation.
 - `test_showcase.py`: Verifies 100% of ApexVault ACID transactions, concurrency, TTL, and crash recovery.
 - `test_benchmarks.py`: Verifies mathematical models and JSON schema exports for empirical benchmarks.
+- `test_polyglot.py`: Verifies multi-language gates, NPM dependency guards, compiler error parsing, and rapid step memory updates.
 
 ---
 
@@ -282,11 +287,11 @@ apex-engine/
 ├── scripts/
 │   ├── apex_cli.py                   # Master unified CLI entrypoint (apex)
 │   ├── condense.py                   # Context distillation & snapshot engine
-│   ├── dep_guard.py                  # AST dependency & import verifier
-│   ├── gatekeeper.py                 # Invariant enforcer & placeholder scanner
-│   ├── self_heal.py                  # Error parser & active state healer
+│   ├── dep_guard.py                  # Polyglot AST dependency & import verifier
+│   ├── gatekeeper.py                 # Polyglot invariant enforcer & placeholder scanner
+│   ├── self_heal.py                  # Polyglot error parser & active state healer
 │   ├── studio.py                     # Zero-dependency dark-mode visual web HUD
-│   └── vibe_synthesizer.py           # Natural language prompt -> contract decomposer
+│   └── vibe_synthesizer.py           # Stack-aware prompt -> contract decomposer
 ├── showcase/
 │   ├── __init__.py
 │   ├── apex_vault.py                 # Transactional KV & event engine (Proof of Work)
@@ -302,11 +307,14 @@ apex-engine/
 │   ├── test_dep_guard.py
 │   ├── test_e2e_simulation.py
 │   ├── test_gatekeeper.py
+│   ├── test_polyglot.py
 │   ├── test_self_heal.py
 │   ├── test_showcase.py
 │   ├── test_skill_purity.py
 │   ├── test_snapshot.py
 │   ├── test_studio.py
+│   ├── test_templates.py
+│   └── test_vibe_synthesizer.py
 │   ├── test_templates.py
 │   └── test_vibe_synthesizer.py
 ├── SKILL.md                          # Master cognitive protocol & agent contract

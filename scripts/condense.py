@@ -250,6 +250,41 @@ def update_active_state(
     return content
 
 
+def quick_step(target_dir: str, message: str) -> str:
+    """Convenience helper to record a rapid progress step into active_state.md."""
+    context_dir = os.path.join(target_dir, ".context")
+    state_file = os.path.join(context_dir, "active_state.md")
+
+    current_goal = "Active Feature Development"
+    current_invariants = "Production quality invariants locked"
+    current_gate = "VERIFY"
+    current_gate_status = "IN_PROGRESS"
+
+    if os.path.isfile(state_file):
+        try:
+            with open(state_file, "r", encoding="utf-8") as f:
+                existing = f.read()
+            g_match = re.search(r"\*\*Goal\*\*:\s*([^\n]+)", existing)
+            if g_match:
+                current_goal = g_match.group(1).strip()
+            inv_match = re.search(r"## Pinned Invariants & Key Symbols\s*\n-\s*\*\*Invariants\*\*:\s*\n((?:\s*-\s*[^\n]+\n*)*)", existing)
+            if inv_match and inv_match.group(1).strip():
+                current_invariants = inv_match.group(1).strip().lstrip("- ")
+        except Exception:
+            return ""
+
+    return update_active_state(
+        target_dir=target_dir,
+        goal=current_goal,
+        gate=current_gate,
+        next_action=message,
+        invariants=current_invariants,
+        task="Progress Step",
+        status="IN_PROGRESS",
+        gate_status=current_gate_status
+    )
+
+
 def get_next_epoch_number(history_file: str) -> int:
     """Calculates next monotonic epoch number from history.log."""
     if not os.path.isfile(history_file):
@@ -440,6 +475,11 @@ def main(argv=None) -> int:
     status_parser = subparsers.add_parser("status", help="Print active_state.md to stdout")
     status_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
 
+    # step (rapid single-argument progress update)
+    step_parser = subparsers.add_parser("step", help="Quick one-line active memory progress update")
+    step_parser.add_argument("message", help="Brief progress and immediate next step")
+    step_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
+
     args = parser.parse_args(argv)
     target_dir = os.path.abspath(args.dir)
 
@@ -484,6 +524,10 @@ def main(argv=None) -> int:
         else:
             sys.stderr.write(output + "\n")
             return 1
+    elif args.command == "step":
+        quick_step(target_dir, args.message)
+        print(f"Recorded step in {target_dir}")
+        return 0
     return 0
 
 

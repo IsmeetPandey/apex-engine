@@ -64,6 +64,67 @@ def get_local_modules(target_dir: str) -> Set[str]:
     return modules
 
 
+NODE_BUILTINS = {
+    "assert", "async_hooks", "buffer", "child_process", "cluster", "console",
+    "constants", "crypto", "dgram", "diagnostics_channel", "dns", "domain",
+    "events", "fs", "http", "http2", "https", "inspector", "module", "net",
+    "os", "path", "perf_hooks", "process", "punycode", "querystring", "readline",
+    "repl", "stream", "string_decoder", "timers", "tls", "trace_events", "tty",
+    "url", "util", "v8", "vm", "wasi", "worker_threads", "zlib"
+}
+
+JS_TS_EXTENSIONS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
+
+
+def get_npm_declared_dependencies(target_dir: str) -> Set[str]:
+    """Parses package.json for dependencies and devDependencies."""
+    declared = set()
+    pkg_file = os.path.join(target_dir, "package.json")
+    if os.path.isfile(pkg_file):
+        try:
+            import json
+            with open(pkg_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                for section in ("dependencies", "devDependencies", "peerDependencies"):
+                    if section in data and isinstance(data[section], dict):
+                        declared.update(data[section].keys())
+        except Exception:
+            return declared
+    return declared
+
+
+def extract_js_ts_imports(file_path: str) -> List[Tuple[str, int]]:
+    """Extracts non-relative imported package names from JS/TS files."""
+    imports = []
+    import_regex = re.compile(r"""(?:import\s+(?:[\w*\s{},]*\s+from\s+)?|require\s*\(\s*)["']([^"']+)["']""")
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            for lineno, line in enumerate(f, 1):
+                # Ignore pure comment lines
+                stripped = line.strip()
+                if stripped.startswith("//") or stripped.startswith("/*") or stripped.startswith("*"):
+                    continue
+                match = import_regex.search(line)
+                if match:
+                    pkg = match.group(1).strip()
+                    # Skip relative path imports or path aliases (@/, ~/)
+                    if pkg.startswith(".") or pkg.startswith("/") or pkg.startswith("@/") or pkg.startswith("~/"):
+                        continue
+                    # Extract top-level package or scoped package (@org/pkg)
+                    if pkg.startswith("@"):
+                        parts = pkg.split("/")
+                        top_pkg = "/".join(parts[:2]) if len(parts) >= 2 else pkg
+                    else:
+                        top_pkg = pkg.split("/")[0]
+                    # Strip 'node:' prefix if present
+                    if top_pkg.startswith("node:"):
+                        top_pkg = top_pkg[5:]
+                    imports.append((top_pkg, lineno))
+    except Exception:
+        return []
+    return imports
+
+
 def get_declared_dependencies(target_dir: str) -> Set[str]:
     """Parses requirements.txt or pyproject.toml if present."""
     declared = set()
@@ -78,7 +139,7 @@ def get_declared_dependencies(target_dir: str) -> Set[str]:
                         pkg = re.split(r"[><=~;]", line)[0].strip().replace("-", "_").lower()
                         declared.add(pkg)
         except Exception:
-            pass
+            return declared
     return declared
 
 
@@ -104,25 +165,36 @@ def extract_imports_from_file(file_path: str) -> List[Tuple[str, int]]:
 
 
 def check_directory(target_dir: str, allowed_extra: Set[str] = None) -> List[str]:
-    """Scans target_dir and returns list of violation strings."""
+    """Scans target_dir and returns list of violation strings for Python and JS/TS."""
     if allowed_extra is None:
         allowed_extra = set()
 
     stdlib = get_stdlib_modules()
     local = get_local_modules(target_dir)
     declared = get_declared_dependencies(target_dir)
-    valid_names = stdlib.union(local).union(declared).union(allowed_extra)
+    valid_py_names = stdlib.union(local).union(declared).union(allowed_extra)
+
+    # Node / NPM ecosystem
+    npm_declared = get_npm_declared_dependencies(target_dir)
+    valid_npm_names = NODE_BUILTINS.union(npm_declared).union(allowed_extra)
 
     violations = []
     for root, dirs, files in os.walk(target_dir):
-        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in {"venv", "env", "node_modules", "__pycache__"}]
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in {"venv", "env", "node_modules", "__pycache__", "dist", "build"}]
         for f in files:
-            if f.endswith(".py"):
-                full_path = os.path.join(root, f)
-                rel_path = os.path.relpath(full_path, target_dir)
+            ext = os.path.splitext(f)[1].lower()
+            full_path = os.path.join(root, f)
+            rel_path = os.path.relpath(full_path, target_dir)
+
+            if ext == ".py":
                 for mod_name, lineno in extract_imports_from_file(full_path):
-                    if mod_name.lower() not in valid_names and mod_name not in valid_names:
-                        violations.append(f"{rel_path}:{lineno} - Unresolvable/hallucinated import: '{mod_name}'")
+                    if mod_name.lower() not in valid_py_names and mod_name not in valid_py_names:
+                        violations.append(f"{rel_path}:{lineno} - Unresolvable/hallucinated Python import: '{mod_name}'")
+
+            elif ext in JS_TS_EXTENSIONS:
+                for pkg_name, lineno in extract_js_ts_imports(full_path):
+                    if pkg_name not in valid_npm_names:
+                        violations.append(f"{rel_path}:{lineno} - Unresolvable/hallucinated NPM import: '{pkg_name}' (missing from package.json)")
 
     return violations
 
