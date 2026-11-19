@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12']
 
     steps:
       - name: Checkout repository
@@ -30,6 +30,9 @@ jobs:
         run: |
           git config --global user.name "CI Runner"
           git config --global user.email "ci@apexengine.org"
+
+      - name: Initialize Context Buffer
+        run: python scripts/condense.py init
 
       - name: Run Test Discovery Suite (31 Tests)
         run: python -m unittest discover -s tests -v

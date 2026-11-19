@@ -88,8 +88,16 @@ def check_active_state(target_dir: str) -> List[str]:
     violations = []
     state_file = os.path.join(target_dir, ".context", "active_state.md")
     if not os.path.isfile(state_file):
-        violations.append("Missing .context/active_state.md. Run 'python scripts/condense.py init'")
-        return violations
+        # In a fresh checkout, auto-initialize context buffer
+        init_script = os.path.join(os.path.dirname(__file__), "condense.py")
+        if os.path.isfile(init_script):
+            try:
+                subprocess.run([sys.executable, init_script, "init", "--dir", target_dir], capture_output=True, timeout=5)
+            except Exception:
+                pass
+        if not os.path.isfile(state_file):
+            violations.append("Missing .context/active_state.md. Run 'python scripts/condense.py init'")
+            return violations
 
     size = os.path.getsize(state_file)
     if size > 2500:
