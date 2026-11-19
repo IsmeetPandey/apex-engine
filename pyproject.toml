@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "apex-engine"
-version = "1.1.0"
-description = "Flagship code quality & infinite 2M context persistence for compact AI models."
+version = "2.0.0"
+description = "Make vibe coding cheap: Flagship quality, infinite context & autonomous guardrails for compact AI models."
 readme = "README.md"
 authors = [
     { name = "Ismeet Pandey", email = "ismeetpandey3@gmail.com" }
 ]
 license = { text = "MIT" }
-keywords = ["ai-agents", "antigravity", "claude-code", "codex", "llm-memory", "context-compression", "tdd"]
+keywords = ["vibe-coding", "ai-agents", "antigravity", "claude-code", "codex", "llm-memory", "context-compression", "tdd"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -23,8 +23,13 @@ requires-python = ">=3.8"
 dependencies = []
 
 [project.scripts]
-apex = "scripts.condense:main"
+apex = "scripts.apex_cli:main"
 apex-gate = "scripts.gatekeeper:main"
+apex-condense = "scripts.condense:main"
+apex-vibe = "scripts.vibe_synthesizer:main"
+apex-deps = "scripts.dep_guard:main"
+apex-heal = "scripts.self_heal:main"
+apex-studio = "scripts.studio:main"
 
 [project.urls]
 Homepage = "https://github.com/IsmeetPandey/apex-engine"
