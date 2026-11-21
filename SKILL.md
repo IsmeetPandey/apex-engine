@@ -274,6 +274,8 @@ Lightweight models frequently generate rationalizations to bypass rigorous engin
 | 10 | *"The user instructions did not mention edge cases, so handling normal inputs is sufficient."* | **Senior engineers build defensively by default.** Handle nulls, empty collections, unexpected types, and boundary conditions regardless of prompt brevity. |
 | 11 | *"I can summarize file changes from memory without checking git status."* | **Memory drifts from disk reality.** Always run `git status -s` and inspect actual diffs before declaring an epoch complete. |
 | 12 | *"The build failed due to an unrelated environment warning, so I can ignore the exit code."* | **Non-zero exit codes are failures.** Investigate and resolve all errors or explicitly document and isolate external blockers with terminal evidence. |
+| 13 | *"This error happened at line N, so adding 'if x is None: return' here fixes it."* | **Anti-Band-Aid Protocol: The crash site is rarely the fault origin.** Adding a null guard swallows illegal state and corrupts downstream data. Trace the upstream producer where the invalid state was created and fix it at source. |
+| 14 | *"A single hardcoded point-assertion is sufficient to satisfy Gate 2."* | **Tautological and shallow tests breed false confidence.** Verify at least one leg of the Universal Invariant Triad (Round-Trip, Idempotence, or Conservation) and stress boundary conditions. |
 
 ---
 
@@ -302,7 +304,7 @@ When any of the following triggers occur, the agent must **STOP IMMEDIATELY** an
 
 ## 6. Adaptive Teamwork & Subagent Swarm Protocol
 
-ApexEngine adapts dynamically depending on whether it is running within a multi-agent environment (e.g., Google Antigravity) or as a standalone single-agent CLI (e.g., Claude Code, Cursor, Codex).
+ApexEngine adapts dynamically depending on whether it is running within a multi-agent environment (e.g., Google Antigravity) or as a standalone single-agent CLI (e.g., Cursor, terminal CLI, or standalone coding environments).
 
 ### Mode A: Multi-Agent Swarm Protocol (Antigravity Orchestration)
 
@@ -358,7 +360,7 @@ VERIFICATION: <Exact terminal command that must pass with exit code 0>
 
 ---
 
-### Mode B: Standalone Single-Agent Fallback (Claude Code / Codex / CLI)
+### Mode B: Standalone Single-Agent Fallback (Terminal CLI & Autonomous Environments)
 
 When operating as a single autonomous agent without subagent dispatch capabilities:
 1. **Act as your own rigid state machine**: Maintain strict separation between your inspection phase, test authoring phase, implementation phase, and verification phase.

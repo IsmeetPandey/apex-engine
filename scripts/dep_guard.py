@@ -128,6 +128,8 @@ def extract_js_ts_imports(file_path: str) -> List[Tuple[str, int]]:
 def get_declared_dependencies(target_dir: str) -> Set[str]:
     """Parses requirements.txt or pyproject.toml if present."""
     declared = set()
+
+    # 1. Parse requirements.txt
     req_file = os.path.join(target_dir, "requirements.txt")
     if os.path.isfile(req_file):
         try:
@@ -135,11 +137,63 @@ def get_declared_dependencies(target_dir: str) -> Set[str]:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith("#"):
-                        # Extract package name before ==, >=, etc.
-                        pkg = re.split(r"[><=~;]", line)[0].strip().replace("-", "_").lower()
-                        declared.add(pkg)
-        except Exception:
+                        pkg = re.split(r"[><=~;\[]", line)[0].strip().replace("-", "_").lower()
+                        if pkg:
+                            declared.add(pkg)
+        except (OSError, UnicodeDecodeError):
             return declared
+
+    # 2. Parse pyproject.toml
+    pyproject_file = os.path.join(target_dir, "pyproject.toml")
+    if os.path.isfile(pyproject_file):
+        try:
+            with open(pyproject_file, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+
+            parsed = False
+            try:
+                import tomllib  # Python 3.11+ stdlib
+                data = tomllib.loads(content)
+                parsed = True
+                # Standard PEP 621 [project.dependencies]
+                for dep in data.get("project", {}).get("dependencies", []):
+                    pkg = re.split(r"[><=~;\[]", dep)[0].strip().replace("-", "_").lower()
+                    if pkg:
+                        declared.add(pkg)
+                # [project.optional-dependencies]
+                for group in data.get("project", {}).get("optional-dependencies", {}).values():
+                    for dep in group:
+                        pkg = re.split(r"[><=~;\[]", dep)[0].strip().replace("-", "_").lower()
+                        if pkg:
+                            declared.add(pkg)
+                # Poetry [tool.poetry.dependencies]
+                for dep in data.get("tool", {}).get("poetry", {}).get("dependencies", {}).keys():
+                    if dep.lower() != "python":
+                        declared.add(dep.replace("-", "_").lower())
+            except Exception:
+                parsed = False
+
+            if not parsed:
+                # Regex fallback for Python < 3.11
+                # Matches strings in dependencies = [ "package>=1.0", ... ]
+                dep_block = re.search(r"dependencies\s*=\s*\[(.*?)\]", content, re.DOTALL)
+                if dep_block:
+                    for item in re.findall(r'["\']([^"\']+)["\']', dep_block.group(1)):
+                        pkg = re.split(r"[><=~;\[]", item)[0].strip().replace("-", "_").lower()
+                        if pkg:
+                            declared.add(pkg)
+                # Matches poetry keys: package = "^1.0"
+                poetry_block = re.search(r"\[tool\.poetry\.dependencies\](.*?)(?=\n\[|\Z)", content, re.DOTALL)
+                if poetry_block:
+                    for line in poetry_block.group(1).splitlines():
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            key = line.split("=")[0].strip().strip('"\'')
+                            if key.lower() != "python":
+                                declared.add(key.replace("-", "_").lower())
+        except (OSError, UnicodeDecodeError):
+            return declared
+
     return declared
 
 

@@ -22,6 +22,7 @@ import vibe_synthesizer
 import dep_guard
 import self_heal
 import studio
+import blast_analyzer
 
 
 def main(argv=None) -> int:
@@ -78,7 +79,15 @@ def main(argv=None) -> int:
     gate_parser = subparsers.add_parser("gate", help="Run Gatekeeper invariant pre-commit checks")
     gate_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
     gate_parser.add_argument("--install-hook", action="store_true", help="Install as git pre-commit hook")
-    gate_parser.add_argument("--strict-tests", action="store_true", help="Fail if code changed without test")
+    gate_parser.add_argument("--strict-tests", action="store_true", default=True, help="Fail if code changed without test")
+    gate_parser.add_argument("--allow-no-tests", action="store_true", help="Allow committing without companion tests")
+    gate_parser.add_argument("--json", action="store_true", help="Output violations as JSON")
+
+    # 7b. blast: Blast Radius & Dependency Analyzer
+    blast_parser = subparsers.add_parser("blast", help="Analyze blast radius and downstream consumers")
+    blast_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
+    blast_parser.add_argument("--files", nargs="*", help="Specific files to analyze")
+    blast_parser.add_argument("--json", action="store_true", help="Output results as JSON")
 
     # 8. deps: Dependency & Import Guard
     deps_parser = subparsers.add_parser("deps", help="Verify imports and catch hallucinated packages")
@@ -129,9 +138,19 @@ def main(argv=None) -> int:
         sub_argv = ["--dir", args.dir]
         if args.install_hook:
             sub_argv.append("--install-hook")
-        if args.strict_tests:
-            sub_argv.append("--strict-tests")
+        if args.allow_no_tests:
+            sub_argv.append("--allow-no-tests")
+        if args.json:
+            sub_argv.append("--json")
         return gatekeeper.main(sub_argv)
+
+    elif args.subcommand == "blast":
+        sub_argv = ["--dir", args.dir]
+        if args.files:
+            sub_argv.extend(["--files"] + args.files)
+        if args.json:
+            sub_argv.append("--json")
+        return blast_analyzer.main(sub_argv)
 
     elif args.subcommand == "deps":
         sub_argv = ["--dir", args.dir]

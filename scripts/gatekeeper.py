@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
 """
-ApexEngine Gatekeeper: Pre-Commit & Verification Enforcer
-Enforces all 4 Invariant Gates prior to git commit.
+ApexEngine Gatekeeper 3.0: Peak Quality, SAST & Verification Enforcer
+Enforces all 4 Invariant Gates prior to git commit:
+- Static Security (AST SAST & Secret Scanning)
+- Code Complexity & Maintainability (McCabe CC <= 10, nesting depth <= 4, monolithic limit)
+- Test Authenticity (Anti-Tautology & Assertion Density Guard)
+- Zero Placeholders & Band-Aids (Polyglot)
 Zero external dependencies: Python 3.8+ standard library only.
 """
 
 import os
 import sys
 import re
+import ast
+import json
 import argparse
 import subprocess
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any, Set, Optional
 
 FORBIDDEN_PATTERNS = [
     (re.compile(r"(?i)\bTODO\b"), "TODO placeholder found"),
     (re.compile(r"(?i)\bFIXME\b"), "FIXME placeholder found"),
-    (re.compile(r"^\s*pass\s*$", re.MULTILINE), "Bare 'pass' statement found"),
-    (re.compile(r"^\s*\.\.\.\s*$", re.MULTILINE), "Bare '...' ellipsis placeholder found"),
+    (re.compile(r"^\s*pass\b(?:\s*#.*)?$", re.MULTILINE), "Bare 'pass' statement found"),
+    (re.compile(r"^\s*\.\.\.\s*(?:#.*)?$", re.MULTILINE), "Bare '...' ellipsis placeholder found"),
     (re.compile(r"(?i)left as an exercise"), "'Left as an exercise' placeholder found"),
     (re.compile(r"(?i)implement later"), "'Implement later' placeholder found"),
     (re.compile(r"(?i)placeholder for"), "'Placeholder for' marker found"),
@@ -25,33 +31,139 @@ FORBIDDEN_PATTERNS = [
     (re.compile(r"\bunimplemented!\s*\("), "Rust unimplemented!() macro placeholder found"),
     (re.compile(r"if\s+err\s*!=\s*nil\s*\{\s*\}"), "Go empty error handler found"),
     (re.compile(r"\.catch\s*\(\s*(?:\(\s*\)|[a-zA-Z_]\w*)\s*=>\s*\{\s*\}"), "JavaScript/TypeScript silent swallowed promise catch found"),
+    (re.compile(r"catch\s*\([^)]*\)\s*\{\s*\}"), "JavaScript/TypeScript empty catch block found"),
+    (re.compile(r"except(?:\s+[\w\.]+)?\s*:\s*(?:pass|\.\.\.)", re.MULTILINE), "Python silent exception suppression (except: pass) found"),
+]
+
+SECRET_PATTERNS = [
+    (re.compile(r"(?i)\b(AKIA[0-9A-Z]{16})\b"), "SEC007", "Hardcoded AWS Access Key ID detected"),
+    (re.compile(r"-----BEGIN (?:RSA|EC|DSA|OPENSSH) PRIVATE KEY-----"), "SEC008", "Hardcoded Private Key detected"),
 ]
 
 CODE_EXTENSIONS = {".py", ".ts", ".js", ".jsx", ".tsx", ".go", ".rs", ".java", ".cpp", ".c", ".cs"}
 TEST_PATTERNS = [re.compile(r"(?i)(test_|_test|\.test\.|\.spec\.|tests/|test/|__tests__/)")]
 
 
-def get_modified_files(target_dir: str) -> List[str]:
-    """Retrieves list of staged files, or modified files if none staged."""
-    try:
-        # Check staged files
-        proc = subprocess.run(
-            ["git", "diff", "--cached", "--name-only"],
-            cwd=target_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=5
-        )
-        staged = [f.strip() for f in proc.stdout.splitlines() if f.strip()]
-        if staged:
-            return staged
+class SecuritySASTVisitor(ast.NodeVisitor):
+    """AST visitor that checks for common high-severity security vulnerabilities."""
 
-        # Fallback to unstaged / modified files
-        proc2 = subprocess.run(
-            ["git", "diff", "--name-only"],
+    def __init__(self, filename: str):
+        self.filename = filename
+        self.violations: List[Tuple[int, str, str]] = []
+
+    def _resolve_call_name(self, node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            return node.id
+        elif isinstance(node, ast.Attribute):
+            val = self._resolve_call_name(node.value)
+            return f"{val}.{node.attr}" if val else node.attr
+        return ""
+
+    def visit_Call(self, node: ast.Call):
+        func_name = self._resolve_call_name(node.func)
+
+        # 1. Shell Injection: os.system / os.popen or subprocess(..., shell=True) with dynamic args
+        if func_name in {"os.system", "os.popen"}:
+            self.violations.append((node.lineno, "SEC001", f"Insecure direct shell execution via '{func_name}'"))
+        elif func_name.startswith("subprocess."):
+            for kw in node.keywords:
+                if kw.arg == "shell" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                    if node.args and not isinstance(node.args[0], ast.Constant):
+                        self.violations.append((node.lineno, "SEC002", "Command injection hazard: shell=True with dynamic arguments"))
+
+        # 2. Unsafe Deserialization
+        elif func_name in {"pickle.loads", "pickle.load", "_pickle.loads", "marshal.loads"}:
+            self.violations.append((node.lineno, "SEC003", f"Unsafe deserialization hazard: '{func_name}'"))
+        elif func_name == "yaml.load":
+            has_safe = any(kw.arg == "Loader" and "Safe" in getattr(kw.value, "id", getattr(kw.value, "attr", "")) for kw in node.keywords)
+            if not has_safe:
+                self.violations.append((node.lineno, "SEC004", "Unsafe YAML deserialization: yaml.load without SafeLoader"))
+
+        # 3. Dynamic Arbitrary Code Execution
+        elif func_name in {"eval", "exec"}:
+            self.violations.append((node.lineno, "SEC005", f"Arbitrary code execution hazard: '{func_name}'"))
+
+        # 4. SQL Injection via unparameterized f-strings
+        elif func_name.endswith(".execute") or func_name.endswith(".raw"):
+            if node.args and isinstance(node.args[0], ast.JoinedStr):
+                self.violations.append((node.lineno, "SEC006", "SQL injection hazard: unparameterized f-string in SQL query"))
+
+        self.generic_visit(node)
+
+
+class ComplexityVisitor(ast.NodeVisitor):
+    """AST visitor measuring McCabe Cyclomatic Complexity, nesting depth, and loops."""
+
+    def __init__(self, filename: str):
+        self.filename = filename
+        self.violations: List[Tuple[int, str, str]] = []
+        self._current_nesting = 0
+        self._loop_depth = 0
+
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        self._check_function_metrics(node)
+        self.generic_visit(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
+        self._check_function_metrics(node)
+        self.generic_visit(node)
+
+    def _check_function_metrics(self, node):
+        # 1. Monolithic function check (lines of code)
+        total_lines = getattr(node, "end_lineno", node.lineno) - node.lineno
+        if total_lines > 60:
+            self.violations.append((node.lineno, "CMP001", f"Monolithic function '{node.name}' has {total_lines} lines (max 60)"))
+
+        # 2. Max parameters check
+        param_count = len(node.args.args)
+        if param_count > 5:
+            self.violations.append((node.lineno, "CMP002", f"Parameter bloat: '{node.name}' has {param_count} parameters (max 5)"))
+
+        # 3. Cyclomatic complexity calculation
+        cc = 1  # Base complexity
+        for sub in ast.walk(node):
+            if isinstance(sub, (ast.If, ast.IfExp, ast.For, ast.AsyncFor, ast.While, ast.ExceptHandler, ast.With, ast.Assert)):
+                cc += 1
+            elif isinstance(sub, ast.BoolOp):
+                cc += max(1, len(sub.values) - 1)
+
+        if cc > 10:
+            self.violations.append((node.lineno, "CMP003", f"Excessive Cyclomatic Complexity in '{node.name}' (CC={cc}, max 10)"))
+
+    def visit_If(self, node: ast.If):
+        self._current_nesting += 1
+        if self._current_nesting > 4:
+            self.violations.append((node.lineno, "CMP004", f"Excessive nesting depth ({self._current_nesting} levels, max 4)"))
+        self.generic_visit(node)
+        self._current_nesting -= 1
+
+    def visit_For(self, node: ast.For):
+        self._loop_depth += 1
+        self.generic_visit(node)
+        self._loop_depth -= 1
+
+    def visit_While(self, node: ast.While):
+        self._loop_depth += 1
+        self.generic_visit(node)
+        self._loop_depth -= 1
+
+    def visit_Compare(self, node: ast.Compare):
+        # Anti-O(N^2) trap: linear containment ('x in seq') inside loops over non-set/dict literals
+        if self._loop_depth > 0:
+            for op, comparator in zip(node.ops, node.comparators):
+                if isinstance(op, ast.In) and isinstance(comparator, (ast.Name, ast.Attribute, ast.Call)):
+                    self.violations.append(
+                        (node.lineno, "CMP005", "Potential O(N^2) trap: linear 'in' containment check inside iterative loop")
+                    )
+        self.generic_visit(node)
+
+
+def get_modified_files(target_dir: str) -> List[str]:
+    """Retrieves all staged, unstaged, and untracked code files via git status."""
+    files = set()
+    try:
+        proc = subprocess.run(
+            ["git", "status", "--porcelain"],
             cwd=target_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -60,9 +172,43 @@ def get_modified_files(target_dir: str) -> List[str]:
             errors="replace",
             timeout=5
         )
-        return [f.strip() for f in proc2.stdout.splitlines() if f.strip()]
+        for line in proc.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(maxsplit=1)
+            if len(parts) == 2:
+                path_entry = parts[1]
+                if " -> " in path_entry:
+                    path_entry = path_entry.split(" -> ")[1]
+                path_entry = path_entry.strip().strip('"')
+                ext = os.path.splitext(path_entry)[1].lower()
+                if ext in CODE_EXTENSIONS:
+                    files.add(os.path.normpath(path_entry).replace("\\", "/"))
     except Exception:
-        return []
+        pass
+
+    if not files:
+        # Fallback to git diff --cached or git diff
+        for flag in [["--cached"], []]:
+            try:
+                proc2 = subprocess.run(
+                    ["git", "diff", "--name-only"] + flag,
+                    cwd=target_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=5
+                )
+                for f in proc2.stdout.splitlines():
+                    if f.strip() and os.path.splitext(f.strip())[1].lower() in CODE_EXTENSIONS:
+                        files.add(os.path.normpath(f.strip()).replace("\\", "/"))
+            except Exception:
+                pass
+
+    return sorted(list(files))
 
 
 def check_placeholders(target_dir: str, files: List[str]) -> List[str]:
@@ -71,11 +217,11 @@ def check_placeholders(target_dir: str, files: List[str]) -> List[str]:
     for rel_path in files:
         full_path = os.path.join(target_dir, rel_path)
         ext = os.path.splitext(rel_path)[1].lower()
-        # Skip non-code files, test suites, or gatekeeper's own rule definitions
         if ext not in CODE_EXTENSIONS or not os.path.isfile(full_path):
             continue
         if os.path.basename(rel_path) == "gatekeeper.py":
             continue
+        # Test files are scanned separately for tautologies/empty bodies
         if any(p.search(rel_path) for p in TEST_PATTERNS):
             continue
 
@@ -88,9 +234,103 @@ def check_placeholders(target_dir: str, files: List[str]) -> List[str]:
         for pattern, desc in FORBIDDEN_PATTERNS:
             match = pattern.search(content)
             if match:
-                # Calculate approximate line number
                 line_no = content[:match.start()].count("\n") + 1
                 violations.append(f"{rel_path}:{line_no} - {desc} ('{match.group(0).strip()}')")
+    return violations
+
+
+APEX_TOOL_SCRIPTS = {
+    "gatekeeper.py", "dep_guard.py", "self_heal.py", "blast_analyzer.py",
+    "apex_cli.py", "condense.py", "studio.py", "vibe_synthesizer.py"
+}
+
+
+def check_sast_and_complexity(target_dir: str, files: List[str]) -> List[str]:
+    """Runs AST-based SAST security and complexity visitors."""
+    violations = []
+    for rel_path in files:
+        full_path = os.path.join(target_dir, rel_path)
+        ext = os.path.splitext(rel_path)[1].lower()
+        if not os.path.isfile(full_path):
+            continue
+        if os.path.basename(rel_path) in APEX_TOOL_SCRIPTS:
+            continue
+        if any(p.search(rel_path) for p in TEST_PATTERNS):
+            continue
+
+        try:
+            with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+        except Exception:
+            continue
+
+        # Secret scanning across all file formats
+        for pattern, code, desc in SECRET_PATTERNS:
+            match = pattern.search(content)
+            if match:
+                line_no = content[:match.start()].count("\n") + 1
+                violations.append(f"{rel_path}:{line_no} [{code}] - {desc}")
+
+        # Python-specific AST scanning
+        if ext == ".py":
+            try:
+                tree = ast.parse(content, filename=full_path)
+            except SyntaxError as e:
+                violations.append(f"{rel_path}:{e.lineno} [SYN001] - Python syntax error: {e.msg}")
+                continue
+
+            sec_visitor = SecuritySASTVisitor(rel_path)
+            sec_visitor.visit(tree)
+            for line_no, code, msg in sec_visitor.violations:
+                violations.append(f"{rel_path}:{line_no} [{code}] - {msg}")
+
+            cmp_visitor = ComplexityVisitor(rel_path)
+            cmp_visitor.visit(tree)
+            for line_no, code, msg in cmp_visitor.violations:
+                violations.append(f"{rel_path}:{line_no} [{code}] - {msg}")
+
+    return violations
+
+
+def check_test_authenticity(target_dir: str, files: List[str]) -> List[str]:
+    """Verifies that test files are substantive and free of tautologies or empty bodies."""
+    violations = []
+    test_files = [f for f in files if any(p.search(f) for p in TEST_PATTERNS)]
+
+    for rel_path in test_files:
+        full_path = os.path.join(target_dir, rel_path)
+        ext = os.path.splitext(rel_path)[1].lower()
+        if ext != ".py" or not os.path.isfile(full_path):
+            continue
+
+        try:
+            with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            tree = ast.parse(content, filename=full_path)
+        except Exception:
+            continue
+
+        # Scan for empty test bodies or tautological asserts
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name.startswith("test_"):
+                    # 1. Empty test body check
+                    if len(node.body) == 1 and isinstance(node.body[0], ast.Pass):
+                        violations.append(f"{rel_path}:{node.lineno} [TST001] - Vacuous test function '{node.name}' contains only 'pass'")
+                    elif len(node.body) == 1 and isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Constant) and node.body[0].value.value is Ellipsis:
+                        violations.append(f"{rel_path}:{node.lineno} [TST002] - Vacuous test function '{node.name}' contains only '...'")
+
+                    # 2. Tautological assert check
+                    for sub in ast.walk(node):
+                        if isinstance(sub, ast.Assert):
+                            # assert True, assert 1, assert "a" == "a"
+                            if isinstance(sub.test, ast.Constant) and bool(sub.test.value) is True:
+                                violations.append(f"{rel_path}:{sub.lineno} [TST003] - Tautological assertion 'assert {sub.test.value}' detected")
+                            elif isinstance(sub.test, ast.Compare):
+                                if isinstance(sub.test.left, ast.Constant) and len(sub.test.comparators) == 1 and isinstance(sub.test.comparators[0], ast.Constant):
+                                    if sub.test.left.value == sub.test.comparators[0].value:
+                                        violations.append(f"{rel_path}:{sub.lineno} [TST004] - Tautological constant comparison 'assert {sub.test.left.value} == {sub.test.comparators[0].value}' detected")
+
     return violations
 
 
@@ -99,7 +339,6 @@ def check_active_state(target_dir: str) -> List[str]:
     violations = []
     state_file = os.path.join(target_dir, ".context", "active_state.md")
     if not os.path.isfile(state_file):
-        # In a fresh checkout, auto-initialize context buffer
         init_script = os.path.join(os.path.dirname(__file__), "condense.py")
         if os.path.isfile(init_script):
             try:
@@ -117,9 +356,14 @@ def check_active_state(target_dir: str) -> List[str]:
 
 
 def check_tests_present(files: List[str]) -> List[str]:
-    """Warns if application code changed without any test files."""
+    """Verifies application code changes are accompanied by test files."""
     code_files = [f for f in files if os.path.splitext(f)[1].lower() in CODE_EXTENSIONS]
     if not code_files:
+        return []
+
+    # Check if modified files are all docs/configs
+    non_test_code = [f for f in code_files if not any(p.search(f) for p in TEST_PATTERNS)]
+    if not non_test_code:
         return []
 
     has_test = any(any(p.search(f) for p in TEST_PATTERNS) for f in code_files)
@@ -142,13 +386,12 @@ def install_pre_commit_hook(target_dir: str) -> bool:
     hook_content = (
         "#!/bin/sh\n"
         "# ApexEngine Gatekeeper pre-commit hook\n"
-        "python scripts/gatekeeper.py --dir .\n"
+        "python scripts/gatekeeper.py --dir . --strict-tests\n"
     )
 
     with open(hook_file, "w", encoding="utf-8") as f:
         f.write(hook_content)
 
-    # Make executable on Unix
     try:
         import stat
         st = os.stat(hook_file)
@@ -165,10 +408,14 @@ def main(argv=None) -> int:
     if argv is None:
         argv = sys.argv[1:]
 
-    parser = argparse.ArgumentParser(description="ApexEngine Gatekeeper: Invariant Verification Enforcer")
+    parser = argparse.ArgumentParser(description="ApexEngine Gatekeeper 3.0: Invariant & SAST Enforcer")
     parser.add_argument("--dir", default=".", help="Target repository directory (default: current dir)")
     parser.add_argument("--install-hook", action="store_true", help="Install as git pre-commit hook")
-    parser.add_argument("--strict-tests", action="store_true", help="Treat missing test files as hard failures")
+    parser.add_argument("--strict-tests", action="store_true", default=True, help="Treat missing test files as hard failures (default: True)")
+    parser.add_argument("--allow-no-tests", action="store_true", help="Explicitly allow committing changes without companion tests")
+    parser.add_argument("--strict-sast", action="store_true", default=True, help="Treat SAST security violations as hard failures")
+    parser.add_argument("--strict-complexity", action="store_true", default=True, help="Treat complexity violations as hard failures")
+    parser.add_argument("--json", action="store_true", help="Output violations in JSON format")
 
     args = parser.parse_args(argv)
     target_dir = os.path.abspath(args.dir)
@@ -179,29 +426,40 @@ def main(argv=None) -> int:
     files = get_modified_files(target_dir)
     violations = []
 
-    # Check 1: State buffer
+    # Check 1: State buffer limits
     violations.extend(check_active_state(target_dir))
 
     # Check 2: Placeholders
     if files:
         violations.extend(check_placeholders(target_dir, files))
 
-    # Check 3: Tests present
-    test_violations = check_tests_present(files)
-    if args.strict_tests:
+    # Check 3: SAST & Complexity
+    if files:
+        sast_violations = check_sast_and_complexity(target_dir, files)
+        if args.strict_sast or args.strict_complexity:
+            violations.extend(sast_violations)
+
+    # Check 4: Test authenticity & tautologies
+    if files:
+        violations.extend(check_test_authenticity(target_dir, files))
+
+    # Check 5: Tests present (Contract TDD)
+    if not args.allow_no_tests:
+        test_violations = check_tests_present(files)
         violations.extend(test_violations)
-    elif test_violations:
-        for w in test_violations:
-            print(f"[Gatekeeper Warning]: {w}", file=sys.stderr)
+
+    if args.json:
+        print(json.dumps({"status": "failed" if violations else "passed", "violations": violations}, indent=2))
+        return 1 if violations else 0
 
     if violations:
-        print("\n=== Gatekeeper Rejected: Invariant Gate Violations Detected ===", file=sys.stderr)
+        print("\n=== Gatekeeper Rejected: Invariant Gate Violations Detected (ApexEngine 3.0) ===", file=sys.stderr)
         for v in violations:
             print(f"  ❌ {v}", file=sys.stderr)
-        print("\nFix all violations before proceeding. (ApexEngine Gate 3 & Gate 4 Enforcement)\n", file=sys.stderr)
+        print("\nFix all violations before proceeding. (ApexEngine Gate 2, 3 & Gate 4 Enforcement)\n", file=sys.stderr)
         return 1
 
-    print("=== Gatekeeper Approved: All Invariant Gates Passed ===")
+    print("=== Gatekeeper Approved: All Invariant Gates Passed (ApexEngine 3.0) ===")
     return 0
 
 

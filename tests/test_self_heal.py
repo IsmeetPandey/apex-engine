@@ -59,5 +59,33 @@ AssertionError: Expected 200 OK but received 401 Unauthorized
         self.assertIn("tests/test_auth.py", content)
         self.assertIn("AssertionError", content)
 
+    def test_self_heal_anti_bandaid_classification(self):
+        null_error = """
+Traceback (most recent call last):
+  File "src/service.py", line 15, in get_user_name
+    return user.profile.name
+AttributeError: 'NoneType' object has no attribute 'profile'
+"""
+        res = subprocess.run(
+            ["python", self.script_path, "--error", null_error, "--json"],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertIn('"is_manifestation_site": true', res.stdout)
+        self.assertIn("ANTI-BAND-AID PROTOCOL", res.stdout)
+
+    def test_self_heal_parses_gatekeeper_violations(self):
+        gk_error = "src/payment.py:45 [SEC002] - Command injection hazard: shell=True with dynamic arguments"
+        res = subprocess.run(
+            ["python", self.script_path, "--error", gk_error, "--json"],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("src/payment.py", res.stdout)
+        self.assertIn("45", res.stdout)
+        self.assertIn("SEC002", res.stdout)
+
 if __name__ == "__main__":
     unittest.main()

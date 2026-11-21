@@ -144,10 +144,10 @@ def build_active_state_content(
         "## Pinned Invariants & Key Symbols\n"
         "- **Invariants**:\n"
         f"{inv_lines}\n\n"
-        "## Modified Files & Git Diffs\n"
-        "{GIT_PLACEHOLDER}\n\n"
         "## Immediate Next Action\n"
-        f"- {next_action}\n"
+        f"- {next_action}\n\n"
+        "## Modified Files & Git Diffs\n"
+        "{GIT_PLACEHOLDER}\n"
     )
 
     base_without_git = template.replace("{GIT_PLACEHOLDER}", "")
@@ -270,6 +270,12 @@ def quick_step(target_dir: str, message: str) -> str:
             inv_match = re.search(r"## Pinned Invariants & Key Symbols\s*\n-\s*\*\*Invariants\*\*:\s*\n((?:\s*-\s*[^\n]+\n*)*)", existing)
             if inv_match and inv_match.group(1).strip():
                 current_invariants = inv_match.group(1).strip().lstrip("- ")
+            gate_match = re.search(r"\*\*Gate\*\*:\s*([^\n]+)", existing)
+            if gate_match:
+                current_gate = gate_match.group(1).strip()
+            status_match = re.search(r"\*\*Last Status\*\*:\s*([^\n]+)", existing)
+            if status_match:
+                current_gate_status = status_match.group(1).strip()
         except Exception:
             return ""
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 ApexEngine Self-Healing Diagnostic Engine (self_heal.py)
-Parses compiler, linter, and runtime test errors, isolates root cause,
-and generates targeted atomic remediation directives in .context/active_state.md.
+Parses compiler, linter, runtime, and Gatekeeper errors, isolates root cause,
+enforces the Anti-Band-Aid Protocol (Origin vs Manifestation site),
+and preserves context invariants in .context/active_state.md.
 Zero external dependencies: Python 3.8+ standard library only.
 """
 
@@ -14,22 +15,37 @@ import argparse
 import subprocess
 from typing import Dict, Any, Optional
 
+MANIFESTATION_EXCEPTIONS = {
+    "AttributeError", "TypeError", "KeyError", "IndexError",
+    "NullPointerException", "ZeroDivisionError", "UnboundLocalError"
+}
+
 
 def parse_error_log(error_text: str) -> Dict[str, Any]:
-    """Extracts failing file, line, exception type, and message from error logs across Python, TS/JS, Go, and Rust."""
+    """Extracts failing file, line, exception type, and message from error logs."""
     failing_file = "unknown"
     line_no = 0
     function_name = ""
     error_type = "RuntimeError"
     error_msg = ""
+    is_manifestation = False
+
+    # Check 0: Gatekeeper 3.0 violation: "file.py:14 [SEC001] - message" or "file.py:10 - desc"
+    gk_match = re.search(r'([a-zA-Z0-9_\-\./\\]+\.(?:py|ts|tsx|js|jsx|go|rs)):(\d+)\s*(?:\[([A-Z0-9_]+)\])?\s*-\s*([^\n]+)', error_text)
+    if gk_match:
+        failing_file = gk_match.group(1)
+        line_no = int(gk_match.group(2))
+        error_type = gk_match.group(3) or "GatekeeperViolation"
+        error_msg = gk_match.group(4).strip()
 
     # Check 1: TypeScript / JavaScript tsc error: "src/App.tsx(14,5): error TS2322: ..." or "src/App.tsx:14:5 - error TS2322: ..."
-    ts_match = re.search(r'([a-zA-Z0-9_\-\./\\]+\.(?:ts|tsx|js|jsx))(?:\((\d+),\d+\)|:(\d+):\d+)\s*(?:-\s*error\s*|:\s*error\s*)(TS\d+)?:?\s*([^\n]+)', error_text)
-    if ts_match:
-        failing_file = ts_match.group(1)
-        line_no = int(ts_match.group(2) or ts_match.group(3))
-        error_type = ts_match.group(4) or "TypeScriptError"
-        error_msg = ts_match.group(5).strip()
+    elif re.search(r'([a-zA-Z0-9_\-\./\\]+\.(?:ts|tsx|js|jsx))(?:\((\d+),\d+\)|:(\d+):\d+)\s*(?:-\s*error\s*|:\s*error\s*)(TS\d+)?:?\s*([^\n]+)', error_text):
+        ts_match = re.search(r'([a-zA-Z0-9_\-\./\\]+\.(?:ts|tsx|js|jsx))(?:\((\d+),\d+\)|:(\d+):\d+)\s*(?:-\s*error\s*|:\s*error\s*)(TS\d+)?:?\s*([^\n]+)', error_text)
+        if ts_match:
+            failing_file = ts_match.group(1)
+            line_no = int(ts_match.group(2) or ts_match.group(3))
+            error_type = ts_match.group(4) or "TypeScriptError"
+            error_msg = ts_match.group(5).strip()
 
     # Check 2: Rust rustc/cargo error: "error[E0425]: ... --> src/main.rs:18:5"
     elif "-->" in error_text and ".rs:" in error_text:
@@ -74,10 +90,19 @@ def parse_error_log(error_text: str) -> Dict[str, Any]:
             error_type = "TestFailure"
             error_msg = fail_match.group(3).strip()
 
-    remediation = (
-        f"Inspect {failing_file}:{line_no} and resolve {error_type}: '{error_msg}'. "
-        "Apply minimal targeted fix without altering unaffected contracts."
-    )
+    # Determine Anti-Band-Aid classification
+    if error_type in MANIFESTATION_EXCEPTIONS:
+        is_manifestation = True
+        remediation = (
+            f"ANTI-BAND-AID PROTOCOL: {error_type} at {failing_file}:{line_no} is a manifestation site. "
+            "DO NOT slap a null guard (e.g., 'if obj is None: return' or 'obj?.x'). "
+            "Trace upstream producer/factory where invalid state originated and fix at source."
+        )
+    else:
+        remediation = (
+            f"Inspect {failing_file}:{line_no} and resolve {error_type}: '{error_msg}'. "
+            "Apply minimal targeted fix without altering unaffected contracts."
+        )
 
     return {
         "failing_file": failing_file,
@@ -85,6 +110,7 @@ def parse_error_log(error_text: str) -> Dict[str, Any]:
         "function": function_name,
         "error_type": error_type,
         "error_message": error_msg,
+        "is_manifestation_site": is_manifestation,
         "remediation": remediation
     }
 
@@ -119,26 +145,51 @@ def main(argv=None) -> int:
         print("=== ApexEngine Diagnostic Report ===")
         print(f"  Culprit: {diagnostic['failing_file']}:{diagnostic['line_number']}")
         print(f"  Error:   {diagnostic['error_type']} - {diagnostic['error_message']}")
+        print(f"  Site:    {'Manifestation (Upstream Check Required)' if diagnostic['is_manifestation_site'] else 'Direct Site'}")
         print(f"  Action:  {diagnostic['remediation']}")
 
     if args.apply:
         condense_script = os.path.join(os.path.dirname(__file__), "condense.py")
         if os.path.isfile(condense_script):
-            next_action = f"Fix {diagnostic['failing_file']}:{diagnostic['line_number']} ({diagnostic['error_type']}: {diagnostic['error_message']})"
+            state_file = os.path.join(target_dir, ".context", "active_state.md")
+            current_goal = "Resolve Diagnostic Failure"
+            current_invariants = f"Target: {diagnostic['failing_file']}; Issue: {diagnostic['error_type']}"
+            current_gate = "VERIFY"
+
+            # Non-destructive preservation of existing state
+            if os.path.isfile(state_file):
+                try:
+                    with open(state_file, "r", encoding="utf-8") as f:
+                        existing = f.read()
+                    g_match = re.search(r"\*\*Goal\*\*:\s*([^\n]+)", existing)
+                    if g_match:
+                        current_goal = g_match.group(1).strip()
+                    inv_match = re.search(r"## Pinned Invariants & Key Symbols\s*\n-\s*\*\*Invariants\*\*:\s*\n((?:\s*-\s*[^\n]+\n*)*)", existing)
+                    if inv_match and inv_match.group(1).strip():
+                        # Append diagnostic constraint without wiping original invariants
+                        old_invs = inv_match.group(1).strip().lstrip("- ")
+                        current_invariants = f"{old_invs}\n  - Diagnostic Invariant: {diagnostic['remediation']}"
+                    gate_match = re.search(r"\*\*Gate\*\*:\s*([^\n]+)", existing)
+                    if gate_match:
+                        current_gate = gate_match.group(1).strip()
+                except (OSError, UnicodeDecodeError):
+                    current_invariants = f"Target: {diagnostic['failing_file']}; Issue: {diagnostic['error_type']}"
+
+            next_action = f"Fix {diagnostic['failing_file']}:{diagnostic['line_number']} ({diagnostic['error_type']})"
             cmd = [
                 sys.executable,
                 condense_script,
                 "update",
                 "--dir", target_dir,
-                "--goal", "Resolve Test / Runtime Failure",
-                "--gate", "VERIFY",
+                "--goal", current_goal,
+                "--gate", current_gate,
                 "--gate-status", "FAILED",
-                "--invariants", f"Target file: {diagnostic['failing_file']}; Issue: {diagnostic['error_type']}",
+                "--invariants", current_invariants,
                 "--next", next_action,
                 "--task", f"Debug {diagnostic['error_type']}"
             ]
             subprocess.run(cmd, check=True, capture_output=True)
-            print("Updated .context/active_state.md with diagnostic remediation.")
+            print("Updated .context/active_state.md with diagnostic remediation (invariants preserved).")
 
     return 0
 

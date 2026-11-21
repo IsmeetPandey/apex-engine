@@ -45,5 +45,25 @@ class TestDepGuard(unittest.TestCase):
         self.assertEqual(res.returncode, 0, f"DepGuard should approve stdlib + local imports: {res.stdout}\n{res.stderr}")
         self.assertIn("All imports verified", res.stdout)
 
+    def test_dep_guard_parses_pyproject_toml_dependencies(self):
+        # Create pyproject.toml declaring a dependency
+        pyproject = Path(self.test_dir) / "pyproject.toml"
+        pyproject.write_text(
+            '[project]\nname = "demo"\nversion = "0.1.0"\ndependencies = [\n    "fastapi>=0.100.0",\n    "pydantic",\n]\n',
+            encoding="utf-8"
+        )
+
+        # Create code file importing declared dependencies
+        app = Path(self.test_dir) / "server.py"
+        app.write_text("import fastapi\nimport pydantic\n", encoding="utf-8")
+
+        res = subprocess.run(
+            ["python", self.script_path, "--dir", self.test_dir],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res.returncode, 0, f"DepGuard should recognize dependencies in pyproject.toml: {res.stdout}\n{res.stderr}")
+        self.assertIn("All imports verified", res.stdout)
+
 if __name__ == "__main__":
     unittest.main()
