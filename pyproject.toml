@@ -32,6 +32,10 @@ apex-heal = "scripts.self_heal:main"
 apex-studio = "scripts.studio:main"
 apex-blast = "scripts.blast_analyzer:main"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scripts*"]
+
 [project.urls]
 Homepage = "https://github.com/IsmeetPandey/apex-engine"
 Repository = "https://github.com/IsmeetPandey/apex-engine.git"
