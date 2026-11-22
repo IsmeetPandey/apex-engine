@@ -70,6 +70,7 @@ Every task, feature, bug fix, or refactor MUST progress sequentially through fou
   2. Inspect caller files, imports, and interface definitions to verify exact symbol signatures.
   3. Lock architectural invariants, constraints, and sensitive contracts into `.context/active_state.md`.
   4. Forbid blind code generation based on assumptions or conversational recall.
+  5. Bind established state variables, baseline scores, port numbers, and interface constants into `.context/invariants.json` via `apex bind <name> <val>` to eliminate variable amnesia across long contexts.
 
 ---
 
@@ -160,6 +161,12 @@ The file `.context/active_state.md` must be kept concise, factual, and strictly 
   - Thread safety required (use threading.Lock)
   - Time retrieval must be injectable for deterministic testing
 
+### 🔒 Pinned Invariant Register
+| Symbol | Type | Value | Reg | Constraint |
+|:-------|:-----|:------|:----|:-----------|
+| `PORT` | int | `8080` | IMMUTABLE | `8000..9000` |
+| `STAGE` | state | `GATE_2_TDD` | MONOTONIC | forward DAG |
+
 ## Modified Files & Git Diffs
 - **Touched Files**:
   - `src/limiter.py` - Added sliding window counter class
@@ -244,6 +251,14 @@ python skills/apex-engine/scripts/gatekeeper.py --dir .
 python skills/apex-engine/scripts/gatekeeper.py --install-hook
 ```
 
+#### 8. Invariant State Binding (`apex bind`)
+Binds immutable constants, baseline benchmark scores, and monotonic state machines into `.context/invariants.json`:
+```bash
+apex bind PORT 8080 --type int --immutable --bounds "8000:9000" --desc "Server port"
+apex bind BASELINE_SCORE 0.9465 --type float --immutable --desc "Ground truth accuracy"
+apex check-invariants --dir .
+```
+
 ---
 
 ### Zero-Dependency Markdown Fallback
@@ -276,6 +291,7 @@ Lightweight models frequently generate rationalizations to bypass rigorous engin
 | 12 | *"The build failed due to an unrelated environment warning, so I can ignore the exit code."* | **Non-zero exit codes are failures.** Investigate and resolve all errors or explicitly document and isolate external blockers with terminal evidence. |
 | 13 | *"This error happened at line N, so adding 'if x is None: return' here fixes it."* | **Anti-Band-Aid Protocol: The crash site is rarely the fault origin.** Adding a null guard swallows illegal state and corrupts downstream data. Trace the upstream producer where the invalid state was created and fix it at source. |
 | 14 | *"A single hardcoded point-assertion is sufficient to satisfy Gate 2."* | **Tautological and shallow tests breed false confidence.** Verify at least one leg of the Universal Invariant Triad (Round-Trip, Idempotence, or Conservation) and stress boundary conditions. |
+| 15 | *"I can recall previously established constants and baseline scores from conversation history."* | **Attention degradation and 'Lost in the Middle' cause variable amnesia.** Non-semantic tokens have zero language priors. Bind all constants into .context/invariants.json via apex bind and verify with gatekeeper. |
 
 ---
 

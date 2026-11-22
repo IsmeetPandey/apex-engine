@@ -20,6 +20,12 @@
   - `[FunctionNameOrClass]`: [Brief contract or expected behavior]
   - `[ConfigOrEnvKey]`: [Definition or usage]
 
+### 🔒 Pinned Invariant Register
+| Symbol | Type | Value | Reg | Constraint |
+|:-------|:-----|:------|:----|:-----------|
+| `PORT` | int | `8080` | IMMUTABLE | `8000..9000` |
+| `STAGE` | state | `GATE_1_LOCK` | MONOTONIC | forward DAG |
+
 ## Modified Files & Git Diffs
 - **Touched Files**:
   - `[path/to/file1]` - [Brief change summary]

@@ -24,4 +24,5 @@ wheels/
 htmlcov/
 .context/
 benchmarks/results.json
+benchmarks/amnesia_results.json
 *.wal

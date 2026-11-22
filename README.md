@@ -1,6 +1,6 @@
 # ApexEngine: Flagship Code Quality & Infinite Context for Compact AI Models
 
-[![Test Suite](https://img.shields.io/badge/tests-72%2F72%20passing-brightgreen.svg)]()
+[![Test Suite](https://img.shields.io/badge/tests-91%2F91%20passing-brightgreen.svg)]()
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)]()
 [![Dependencies](https://img.shields.io/badge/dependencies-0%20(stdlib%20only)-orange.svg)]()

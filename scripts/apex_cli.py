@@ -23,6 +23,7 @@ import dep_guard
 import self_heal
 import studio
 import blast_analyzer
+import invariant_store
 
 
 def main(argv=None) -> int:
@@ -119,6 +120,23 @@ def main(argv=None) -> int:
     bench_parser = subparsers.add_parser("benchmark", help="Run empirical memory and head-to-head benchmarks")
     bench_parser.add_argument("--memory-only", action="store_true", help="Run only memory context benchmark")
 
+    # 14. bind: Invariant State Variable Binder
+    bind_parser = subparsers.add_parser("bind", help="Bind an invariant variable into .context/invariants.json")
+    bind_parser.add_argument("name", help="Symbol name (e.g., PORT, BASELINE_SCORE)")
+    bind_parser.add_argument("value", help="Literal value to store")
+    bind_parser.add_argument("--dir", default=".", help="Target project directory")
+    bind_parser.add_argument("--type", dest="val_type", choices=["int", "float", "string", "bool", "list", "dict"], help="Explicit primitive type")
+    bind_parser.add_argument("--immutable", action="store_true", default=True, help="Register as immutable (default: True)")
+    bind_parser.add_argument("--monotonic", action="store_true", help="Register as monotonic state variable")
+    bind_parser.add_argument("--transitions", help="JSON map of allowed transitions for monotonic state")
+    bind_parser.add_argument("--bounds", help="Bounds specification (e.g. min:max or json)")
+    bind_parser.add_argument("--desc", default="", help="Description of invariant purpose")
+
+    # 15. check-invariants: Invariant AST & Integrity Verifier
+    cinv_parser = subparsers.add_parser("check-invariants", help="Verify codebase and active state against .context/invariants.json")
+    cinv_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
+    cinv_parser.add_argument("--json", action="store_true", help="Output violations in JSON format")
+
     args = parser.parse_args(argv)
 
     if args.subcommand == "vibe":
@@ -178,6 +196,26 @@ def main(argv=None) -> int:
         else:
             script = os.path.join(benchmarks_dir, "run_all.py")
         return subprocess.run([sys.executable, script]).returncode
+
+    elif args.subcommand == "bind":
+        sub_argv = ["bind", args.name, args.value, "--dir", args.dir]
+        if args.val_type:
+            sub_argv.extend(["--type", args.val_type])
+        if args.monotonic:
+            sub_argv.append("--monotonic")
+        if args.transitions:
+            sub_argv.extend(["--transitions", args.transitions])
+        if args.bounds:
+            sub_argv.extend(["--bounds", args.bounds])
+        if args.desc:
+            sub_argv.extend(["--desc", args.desc])
+        return invariant_store.main(sub_argv)
+
+    elif args.subcommand == "check-invariants":
+        sub_argv = ["--dir", args.dir, "--check-invariants"]
+        if args.json:
+            sub_argv.append("--json")
+        return gatekeeper.main(sub_argv)
 
     return 0
 

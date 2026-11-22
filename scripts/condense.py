@@ -37,6 +37,11 @@ FALLBACK_ACTIVE_STATE = """# ACTIVE CONTEXT BUFFER
 - **Invariants**:
   - [Constraint 1]
 
+### 🔒 Pinned Invariant Register
+| Symbol | Type | Value | Reg | Constraint |
+|:-------|:-----|:------|:----|:-----------|
+| `PORT` | int | `8080` | IMMUTABLE | `8000..9000` |
+
 ## Modified Files & Git Diffs
 - **Touched Files**:
   - (clean)
@@ -122,13 +127,18 @@ def build_active_state_content(
     task: str = "Active Task",
     status: str = "IN_PROGRESS",
     gate_status: str = "PENDING",
-    git_summary: str = ""
+    git_summary: str = "",
+    invariant_table: str = ""
 ) -> str:
     """Builds active state markdown content strictly bounded < 2,500 bytes."""
     if invariants:
         inv_lines = "\n".join(f"  - {line.strip()}" for line in invariants.splitlines() if line.strip())
     else:
         inv_lines = "  - (none)"
+
+    inv_block = f"- **Invariants**:\n{inv_lines}"
+    if invariant_table:
+        inv_block = f"{inv_block}\n\n{invariant_table}"
 
     template = (
         "# ACTIVE CONTEXT BUFFER\n"
@@ -142,8 +152,7 @@ def build_active_state_content(
         f"- **Command**: `{gate}`\n"
         f"- **Last Status**: {gate_status}\n\n"
         "## Pinned Invariants & Key Symbols\n"
-        "- **Invariants**:\n"
-        f"{inv_lines}\n\n"
+        f"{inv_block}\n\n"
         "## Immediate Next Action\n"
         f"- {next_action}\n\n"
         "## Modified Files & Git Diffs\n"
@@ -183,6 +192,12 @@ def init_context(target_dir: str, force: bool = False) -> None:
     active_path = os.path.join(context_dir, "active_state.md")
     history_path = os.path.join(context_dir, "history.log")
 
+    try:
+        from invariant_store import InvariantStore
+        InvariantStore(context_dir)
+    except (ImportError, OSError, ValueError) as err:
+        sys.stderr.write(f"Notice: Invariant store init bypassed: {err}\n")
+
     if not os.path.isfile(active_path) or force:
         src_active = os.path.join(TEMPLATES_DIR, "active_state_template.md")
         if os.path.isfile(src_active):
@@ -215,6 +230,16 @@ def update_active_state(
     os.makedirs(context_dir, exist_ok=True)
     state_file = os.path.join(context_dir, "active_state.md")
 
+    inv_table = ""
+    try:
+        from invariant_store import InvariantStore
+        store = InvariantStore(context_dir)
+        regs = store.get_invariants()
+        if regs.get("immutable") or regs.get("monotonic"):
+            inv_table = store.render_markdown_table(max_bytes=600)
+    except (ImportError, OSError, ValueError) as err:
+        sys.stderr.write(f"Notice: Invariant table render bypassed: {err}\n")
+
     git_summary = get_git_diff_summary(target_dir)
     content = build_active_state_content(
         goal=goal,
@@ -224,7 +249,8 @@ def update_active_state(
         task=task,
         status=status,
         gate_status=gate_status,
-        git_summary=git_summary
+        git_summary=git_summary,
+        invariant_table=inv_table
     )
 
     temp_fd, temp_path = tempfile.mkstemp(

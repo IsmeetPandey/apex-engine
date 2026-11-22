@@ -241,7 +241,8 @@ def check_placeholders(target_dir: str, files: List[str]) -> List[str]:
 
 APEX_TOOL_SCRIPTS = {
     "gatekeeper.py", "dep_guard.py", "self_heal.py", "blast_analyzer.py",
-    "apex_cli.py", "condense.py", "studio.py", "vibe_synthesizer.py"
+    "apex_cli.py", "condense.py", "studio.py", "vibe_synthesizer.py",
+    "invariant_store.py"
 }
 
 
@@ -334,6 +335,244 @@ def check_test_authenticity(target_dir: str, files: List[str]) -> List[str]:
     return violations
 
 
+class InvariantASTVisitor(ast.NodeVisitor):
+    """AST Visitor that validates code modifications against .context/invariants.json."""
+
+    def __init__(self, filename: str, immutable_invariants: Dict[str, Any]):
+        self.filename = filename
+        self.invariants = immutable_invariants
+        self.violations: List[Tuple[int, str, str]] = []
+
+    def _extract_constant_value(self, node: ast.AST) -> Tuple[bool, Any]:
+        """Extracts literal value from AST Constant or simple unary expressions."""
+        if isinstance(node, ast.Constant):
+            return True, node.value
+        elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub) and isinstance(node.operand, ast.Constant):
+            return True, -node.operand.value
+        return False, None
+
+    def visit_Assign(self, node: ast.Assign):
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id in self.invariants:
+                inv = self.invariants[target.id]
+                expected_val = inv["value"]
+                is_literal, val = self._extract_constant_value(node.value)
+                if is_literal:
+                    if val != expected_val:
+                        self.violations.append((
+                            node.lineno,
+                            "INV001",
+                            f"Illegal mutation of immutable symbol '{target.id}': assigned {val!r}, must be {expected_val!r}"
+                        ))
+                    expected_type = inv.get("type")
+                    if expected_type:
+                        val_type_name = type(val).__name__
+                        if expected_type in ("string", "str") and val_type_name != "str":
+                            self.violations.append((
+                                node.lineno,
+                                "INV003",
+                                f"Type mismatch on '{target.id}': expected {expected_type}, got {val_type_name}"
+                            ))
+                        elif expected_type == "int" and (val_type_name != "int" or isinstance(val, bool)):
+                            self.violations.append((
+                                node.lineno,
+                                "INV003",
+                                f"Type mismatch on '{target.id}': expected {expected_type}, got {val_type_name}"
+                            ))
+                        elif expected_type == "float" and not isinstance(val, (float, int)):
+                            self.violations.append((
+                                node.lineno,
+                                "INV003",
+                                f"Type mismatch on '{target.id}': expected {expected_type}, got {val_type_name}"
+                            ))
+                    b = inv.get("bounds")
+                    if b:
+                        if "min" in b:
+                            try:
+                                if val < b["min"]:
+                                    self.violations.append((
+                                        node.lineno,
+                                        "INV004",
+                                        f"Boundary violation on '{target.id}': {val!r} is below min bound {b['min']}"
+                                    ))
+                            except TypeError:
+                                pass
+                        if "max" in b:
+                            try:
+                                if val > b["max"]:
+                                    self.violations.append((
+                                        node.lineno,
+                                        "INV004",
+                                        f"Boundary violation on '{target.id}': {val!r} exceeds max bound {b['max']}"
+                                    ))
+                            except TypeError:
+                                pass
+                        if "choices" in b and val not in b["choices"]:
+                            self.violations.append((
+                                node.lineno,
+                                "INV004",
+                                f"Boundary violation on '{target.id}': {val!r} not in allowed choices {b['choices']}"
+                            ))
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign):
+        if isinstance(node.target, ast.Name) and node.target.id in self.invariants:
+            inv = self.invariants[node.target.id]
+            expected_val = inv["value"]
+            if node.value is not None:
+                is_literal, val = self._extract_constant_value(node.value)
+                if is_literal:
+                    if val != expected_val:
+                        self.violations.append((
+                            node.lineno,
+                            "INV001",
+                            f"Illegal annotated mutation of immutable symbol '{node.target.id}': assigned {val!r}, must be {expected_val!r}"
+                        ))
+                    expected_type = inv.get("type")
+                    if expected_type:
+                        val_type_name = type(val).__name__
+                        if expected_type in ("string", "str") and val_type_name != "str":
+                            self.violations.append((
+                                node.lineno,
+                                "INV003",
+                                f"Type mismatch on '{node.target.id}': expected {expected_type}, got {val_type_name}"
+                            ))
+                        elif expected_type == "int" and (val_type_name != "int" or isinstance(val, bool)):
+                            self.violations.append((
+                                node.lineno,
+                                "INV003",
+                                f"Type mismatch on '{node.target.id}': expected {expected_type}, got {val_type_name}"
+                            ))
+                        elif expected_type == "float" and not isinstance(val, (float, int)):
+                            self.violations.append((
+                                node.lineno,
+                                "INV003",
+                                f"Type mismatch on '{node.target.id}': expected {expected_type}, got {val_type_name}"
+                            ))
+                    b = inv.get("bounds")
+                    if b:
+                        if "min" in b:
+                            try:
+                                if val < b["min"]:
+                                    self.violations.append((
+                                        node.lineno,
+                                        "INV004",
+                                        f"Boundary violation on '{node.target.id}': {val!r} is below min bound {b['min']}"
+                                    ))
+                            except TypeError:
+                                pass
+                        if "max" in b:
+                            try:
+                                if val > b["max"]:
+                                    self.violations.append((
+                                        node.lineno,
+                                        "INV004",
+                                        f"Boundary violation on '{node.target.id}': {val!r} exceeds max bound {b['max']}"
+                                    ))
+                            except TypeError:
+                                pass
+                        if "choices" in b and val not in b["choices"]:
+                            self.violations.append((
+                                node.lineno,
+                                "INV004",
+                                f"Boundary violation on '{node.target.id}': {val!r} not in allowed choices {b['choices']}"
+                            ))
+        self.generic_visit(node)
+
+    def visit_AugAssign(self, node: ast.AugAssign):
+        if isinstance(node.target, ast.Name) and node.target.id in self.invariants:
+            self.violations.append((
+                node.lineno,
+                "INV001",
+                f"Illegal augmented mutation of immutable symbol '{node.target.id}'"
+            ))
+        self.generic_visit(node)
+
+
+def check_invariants(target_dir: str = ".") -> Tuple[bool, List[str]]:
+    """Validates codebase against .context/invariants.json (rules INV001–INV006)."""
+    violations: List[str] = []
+    context_dir = os.path.join(target_dir, ".context")
+    store_file = os.path.join(context_dir, "invariants.json")
+
+    if not os.path.isfile(store_file):
+        return True, []
+
+    # 1. Verify tamper checksum (INV005)
+    try:
+        scripts_dir = os.path.dirname(os.path.abspath(__file__))
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        from invariant_store import InvariantStore
+        store = InvariantStore(context_dir)
+        valid, msg = store.verify_integrity()
+        if not valid:
+            violations.append(f".context/invariants.json [INV005] - TamperChecksumViolation: {msg}")
+            return False, violations
+        regs = store.get_invariants()
+    except Exception as e:
+        violations.append(f".context/invariants.json [INV005] - Failed to load invariant store: {e}")
+        return False, violations
+
+    immutable_invariants = regs.get("immutable", {})
+    if not immutable_invariants:
+        return True, []
+
+    # 2. Inspect code files
+    modified_files = get_modified_files(target_dir)
+    py_files: List[str] = []
+    if modified_files:
+        py_files = [f for f in modified_files if f.endswith(".py") and not any(p.search(f) for p in TEST_PATTERNS)]
+    if not py_files:
+        for root, dirs, files in os.walk(target_dir):
+            if any(p in root for p in [".git", ".context", "__pycache__", "venv", ".venv", "tests"]):
+                continue
+            for f in files:
+                if f.endswith(".py"):
+                    rel = os.path.relpath(os.path.join(root, f), target_dir).replace("\\", "/")
+                    py_files.append(rel)
+
+    observed_symbol_values: Dict[str, List[Tuple[str, int, Any]]] = {}
+
+    for rel_path in py_files:
+        full_path = os.path.join(target_dir, rel_path)
+        if not os.path.isfile(full_path):
+            continue
+        try:
+            with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            tree = ast.parse(content, filename=full_path)
+        except Exception:
+            continue
+
+        visitor = InvariantASTVisitor(rel_path, immutable_invariants)
+        visitor.visit(tree)
+        for lineno, code, message in visitor.violations:
+            violations.append(f"{rel_path}:{lineno} [{code}] - {message}")
+
+        # Track cross-module definitions for INV006
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id in immutable_invariants:
+                        is_lit, val = visitor._extract_constant_value(node.value)
+                        if is_lit:
+                            if target.id not in observed_symbol_values:
+                                observed_symbol_values[target.id] = []
+                            observed_symbol_values[target.id].append((rel_path, node.lineno, val))
+
+    for sym, occurrences in observed_symbol_values.items():
+        expected_val = immutable_invariants[sym]["value"]
+        for rel_path, lineno, val in occurrences:
+            if val != expected_val:
+                violations.append(
+                    f"{rel_path}:{lineno} [INV006] - DivergentStateViolation: Code defines '{sym} = {val!r}', "
+                    f"diverging from bound invariant value {expected_val!r}"
+                )
+
+    return (len(violations) == 0), violations
+
+
 def check_active_state(target_dir: str) -> List[str]:
     """Verifies .context/active_state.md exists and is within byte limits."""
     violations = []
@@ -415,6 +654,7 @@ def main(argv=None) -> int:
     parser.add_argument("--allow-no-tests", action="store_true", help="Explicitly allow committing changes without companion tests")
     parser.add_argument("--strict-sast", action="store_true", default=True, help="Treat SAST security violations as hard failures")
     parser.add_argument("--strict-complexity", action="store_true", default=True, help="Treat complexity violations as hard failures")
+    parser.add_argument("--check-invariants", action="store_true", help="Run only invariant AST & integrity checks")
     parser.add_argument("--json", action="store_true", help="Output violations in JSON format")
 
     args = parser.parse_args(argv)
@@ -423,11 +663,28 @@ def main(argv=None) -> int:
     if args.install_hook:
         return 0 if install_pre_commit_hook(target_dir) else 1
 
+    if args.check_invariants:
+        inv_ok, inv_violations = check_invariants(target_dir)
+        if args.json:
+            print(json.dumps({"status": "failed" if inv_violations else "passed", "violations": inv_violations}, indent=2))
+        else:
+            if inv_violations:
+                print("\n=== Gatekeeper Rejected: Invariant Violations Detected ===", file=sys.stderr)
+                for v in inv_violations:
+                    print(f"  ❌ {v}", file=sys.stderr)
+            else:
+                print("=== Gatekeeper Approved: Invariant Integrity Verified ===")
+        return 0 if inv_ok else 1
+
     files = get_modified_files(target_dir)
     violations = []
 
     # Check 1: State buffer limits
     violations.extend(check_active_state(target_dir))
+
+    # Check 1b: Invariants and code consistency (INV001–INV006)
+    inv_ok, inv_violations = check_invariants(target_dir)
+    violations.extend(inv_violations)
 
     # Check 2: Placeholders
     if files:
