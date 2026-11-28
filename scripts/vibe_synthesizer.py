@@ -15,6 +15,15 @@ import subprocess
 from pathlib import Path
 from typing import Dict, List, Any
 
+try:
+    import ste_engine
+except ImportError:
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import ste_engine
+    except ImportError:
+        ste_engine = None
+
 
 def extract_keywords(prompt: str) -> List[str]:
     """Tokenizes and cleans keywords from prompt."""
@@ -42,11 +51,15 @@ def synthesize_spec(prompt: str) -> Dict[str, Any]:
     is_go = any(k in prompt_lower for k in ["go", "golang"])
     is_rust = any(k in prompt_lower for k in ["rust", "cargo"])
 
-    objectives = [
+    raw_objectives = [
         f"Implement core logic for: {prompt.strip()}",
         "Enforce strict input validation and boundary condition handling.",
         "Provide automated contract verification test suite with 100% pass guarantee."
     ]
+    if ste_engine is not None:
+        objectives = [ste_engine.format_ste_step(obj) for obj in raw_objectives]
+    else:
+        objectives = raw_objectives
 
     files = []
     slug = re.sub(r"[^a-z0-9]+", "_", clean_title.lower()).strip("_")

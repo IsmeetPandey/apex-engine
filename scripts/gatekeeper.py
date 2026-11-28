@@ -611,6 +611,37 @@ def check_tests_present(files: List[str]) -> List[str]:
     return []
 
 
+def check_ste_specifications(target_dir: str, files: List[str]) -> List[str]:
+    """Lints markdown and specification documents for ASD-STE100 precision violations."""
+    try:
+        import ste_engine
+    except ImportError:
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import ste_engine
+        except ImportError:
+            return []
+
+    violations = []
+    doc_extensions = {".md", ".spec", ".txt"}
+    for rel_path in files:
+        if Path(rel_path).suffix.lower() in doc_extensions:
+            # Skip history or active state logs
+            if "history.log" in rel_path or "active_state.md" in rel_path:
+                continue
+            full_path = os.path.join(target_dir, rel_path)
+            if os.path.isfile(full_path):
+                try:
+                    with open(full_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    ste_violations = ste_engine.lint_ste(content)
+                    for v in ste_violations:
+                        violations.append(f"{rel_path}:{v.line}: [{v.rule_code}] {v.message}")
+                except (OSError, UnicodeDecodeError):
+                    pass
+    return violations
+
+
 def install_pre_commit_hook(target_dir: str) -> bool:
     """Installs gatekeeper as a git pre-commit hook."""
     git_dir = os.path.join(target_dir, ".git")
@@ -655,6 +686,7 @@ def main(argv=None) -> int:
     parser.add_argument("--strict-sast", action="store_true", default=True, help="Treat SAST security violations as hard failures")
     parser.add_argument("--strict-complexity", action="store_true", default=True, help="Treat complexity violations as hard failures")
     parser.add_argument("--check-invariants", action="store_true", help="Run only invariant AST & integrity checks")
+    parser.add_argument("--check-ste", action="store_true", help="Lint specification and documentation files with 80%% ASD-STE100")
     parser.add_argument("--json", action="store_true", help="Output violations in JSON format")
 
     args = parser.parse_args(argv)
@@ -704,6 +736,11 @@ def main(argv=None) -> int:
     if not args.allow_no_tests:
         test_violations = check_tests_present(files)
         violations.extend(test_violations)
+
+    # Check 6: ASD-STE100 Specification Precision (when --check-ste is enabled)
+    if args.check_ste and files:
+        ste_violations = check_ste_specifications(target_dir, files)
+        violations.extend(ste_violations)
 
     if args.json:
         print(json.dumps({"status": "failed" if violations else "passed", "violations": violations}, indent=2))

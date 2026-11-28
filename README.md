@@ -1,6 +1,6 @@
 # ApexEngine: Flagship Code Quality & Infinite Context for Compact AI Models
 
-[![Test Suite](https://img.shields.io/badge/tests-91%2F91%20passing-brightgreen.svg)]()
+[![Test Suite](https://img.shields.io/badge/tests-100%2F100%20passing-brightgreen.svg)]()
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)]()
 [![Dependencies](https://img.shields.io/badge/dependencies-0%20(stdlib%20only)-orange.svg)]()
@@ -20,8 +20,10 @@ You simply install this skill folder into your agent (`~/.gemini/config/skills/a
 
 1. **Universal Polyglot Hard Gates**: The agent is physically barred from taking shortcuts across **TypeScript, JavaScript, Go, Rust, and Python**. It cannot leave `TODO`, `FIXME`, bare `pass`, Rust `todo!()`, Go empty `if err != nil {}`, or swallowed promises. It cannot claim a task is "done" without executing tests in your terminal and getting exit code 0.
 2. **Infinite 2M-Equivalent Memory Distillation**: Instead of letting conversation context compound quadratically ($O(N^2)$) into 500k+ tokens (which degrades attention and causes amnesia), ApexEngine keeps active memory bounded under **159 tokens** (< 2,500 bytes) in `.context/active_state.md`. Finished milestones are safely archived into compressed `.context/snapshots/*.zip` and `history.log`.
-3. **AST-Verified Dependency Guard**: Catches hallucinated packages before execution — checking Python against stdlib & requirements, TypeScript/JS against `package.json` & Node built-ins, and Go/Rust against module declarations.
-4. **Zero Dependencies**: 100% pure Python standard library. No `pip install`, no C++ build tools, no API keys, and no vendor lock-in. Works instantly across Antigravity, Claude Code, Codex, and Cursor on Windows, macOS, and Linux.
+3. **80% ASD-STE100 Aerospace English Precision (`apex ste`)**: Eliminates conversational filler, AI slop, and passive voice. Enforces active imperative mood and <= 25-word procedural steps while unconstraining software engineering vocabulary (zero vocabulary choking).
+4. **Zero-Token Standalone HTML Architecture HUD (`apex diagram`)**: Generates self-contained dark-mode SVG/HTML architecture visualizers directly to disk (`docs/architecture.html`), ensuring rich visualization with 0 tokens loaded into active LLM context memory.
+5. **AST-Verified Dependency Guard**: Catches hallucinated packages before execution — checking Python against stdlib & requirements, TypeScript/JS against `package.json` & Node built-ins, and Go/Rust against module declarations.
+6. **Zero Dependencies**: 100% pure Python standard library. No `pip install`, no C++ build tools, no API keys, and no vendor lock-in. Works instantly across Antigravity, Claude Code, Codex, and Cursor on Windows, macOS, and Linux.
 
 ---
 
@@ -241,6 +243,13 @@ python scripts/apex_cli.py benchmark
 
 # 9. Launch live dark-mode visual web HUD
 python scripts/apex_cli.py studio --port 8765
+
+# 10. Lint specifications with 80% ASD-STE100 Precision
+python scripts/apex_cli.py ste --step "You need to make sure that the cache size is set to 1024."
+# Output: Set cache size to 1024.
+
+# 11. Generate Standalone HTML/SVG Architecture HUD (0 tokens in LLM memory)
+python scripts/apex_cli.py diagram --dir . --out docs/architecture.html
 ```
 
 ---

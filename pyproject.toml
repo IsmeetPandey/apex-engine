@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "apex-engine"
-version = "3.1.0"
+version = "3.2.0"
 description = "Make vibe coding cheap: Flagship quality, infinite context & autonomous guardrails for compact AI models."
 readme = "README.md"
 authors = [
@@ -31,6 +31,8 @@ apex-deps = "scripts.dep_guard:main"
 apex-heal = "scripts.self_heal:main"
 apex-studio = "scripts.studio:main"
 apex-blast = "scripts.blast_analyzer:main"
+apex-ste = "scripts.ste_engine:main"
+apex-diagram = "scripts.diagram_generator:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

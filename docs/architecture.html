@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ApexEngine Architecture HUD</title>
+    <style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text-main: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff;
+    --success: #2ea043; --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text-main); font-family: var(--font-sans); padding: 24px; line-height: 1.5; }
+header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+h1 { font-size: 20px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px; }
+.badge { background: rgba(88,166,255,0.15); color: var(--accent); border: 1px solid var(--accent); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; }
+.meta-bar { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+.section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 12px; }
+.state-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.state-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.state-id { font-size: 11px; font-weight: 700; color: var(--accent); font-family: var(--font-mono); margin-bottom: 4px; }
+.state-title { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+.state-desc { font-size: 11px; color: var(--text-muted); }
+.diagram-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: auto; margin-bottom: 24px; padding: 16px; }
+svg { display: block; margin: 0 auto; }
+.inv-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 24px; }
+.inv-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); font-family: var(--font-mono); font-size: 12px; }
+.inv-name { color: var(--accent); font-weight: 600; }
+.inv-tag { background: rgba(46,160,67,0.2); color: var(--success); padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+.inv-empty { font-size: 12px; color: var(--text-muted); font-style: italic; }
+footer { border-top: 1px solid var(--border); padding-top: 16px; font-size: 11px; color: var(--text-muted); text-align: center; }
+</style>
+</head>
+<body>
+    <header>
+        <h1>ApexEngine Architecture HUD <span class="badge">v3.2.0</span></h1>
+        <div class="meta-bar">Modules: 38 · Dependencies: 43 · Invariants: 0</div>
+    </header>
+    <div class="section-title">Enforced Invariant State Lifecycle</div>
+    <div class="state-grid">
+        <div class="state-card">
+            <div class="state-id">G1</div>
+            <div class="state-title">Gate 1: Context Lock</div>
+            <div class="state-desc">Read target files & callers before touching code</div>
+        </div>
+        
+        <div class="state-card">
+            <div class="state-id">G2</div>
+            <div class="state-title">Gate 2: Contract TDD</div>
+            <div class="state-desc">Executable test reproduces RED before implementation</div>
+        </div>
+        
+        <div class="state-card">
+            <div class="state-id">G3</div>
+            <div class="state-title">Gate 3: Production Rigor</div>
+            <div class="state-desc">Zero placeholders, SAST security, CC <= 10</div>
+        </div>
+        
+        <div class="state-card">
+            <div class="state-id">G4</div>
+            <div class="state-title">Gate 4: Empirical Verify</div>
+            <div class="state-desc">Terminal execution with Exit Code 0</div>
+        </div>
+        </div>
+    <div class="section-title">Component & Dependency Graph</div>
+    <div class="diagram-container"><svg width="1000" height="1940" viewBox="0 0 1000 1940" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff" />
+            </marker>
+        </defs>
+        <g id="edges"><path d="M 170 105 Q 170 225 170 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 105 Q 170 295 170 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 105 Q 320 295 470 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 245 Q 620 225 770 245" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 245 Q 320 295 170 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 245 Q 470 295 470 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 245 Q 620 295 770 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 245 Q 320 365 170 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 245 Q 470 365 470 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 245 Q 620 365 770 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 245 Q 320 435 170 665" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 245 Q 470 435 470 665" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 245 Q 620 435 770 665" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 385 Q 320 435 470 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 525 Q 320 505 470 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 525 Q 170 575 170 665" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 770 665 Q 470 645 170 665" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 805 Q 320 785 170 805" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 770 805 Q 470 785 170 805" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 945 Q 320 575 470 245" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 945 Q 170 645 170 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 945 Q 170 715 170 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 945 Q 320 715 470 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 770 945 Q 470 505 170 105" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 770 945 Q 620 505 470 105" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 770 945 Q 770 505 770 105" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 1085 Q 470 645 770 245" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 1085 Q 320 715 170 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 1225 Q 470 785 770 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 1225 Q 320 785 170 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 770 1225 Q 620 855 470 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 1365 Q 170 855 170 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 1365 Q 320 855 470 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 1365 Q 170 925 170 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 1365 Q 470 925 770 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 170 1365 Q 470 995 770 665" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 1365 Q 320 855 170 385" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 1365 Q 320 925 170 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 1365 Q 470 925 470 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 770 1365 Q 470 925 170 525" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 1505 Q 320 1135 170 805" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 470 1645 Q 320 1135 170 665" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /><path d="M 770 1645 Q 620 1135 470 665" stroke="#58a6ff" stroke-width="2" fill="none" stroke-dasharray="4,4" opacity="0.75" marker-end="url(#arrow)" /></g>
+        <g id="nodes">
+        <g class="module-node" transform="translate(50, 60)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">benchmarks/benchmark_amnesia.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">benchmark_amnesia.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 3F · 15I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 60)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">benchmarks/benchmark_head_to_head.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">benchmark_head_to_head.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 3F · 11I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 60)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">benchmarks/benchmark_memory.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">benchmark_memory.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 2F · 7I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 200)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">benchmarks/run_all.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">run_all.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 1F · 3I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 200)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/apex_cli.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">apex_cli.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 1F · 14I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 200)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/blast_analyzer.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">blast_analyzer.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 6F · 13I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 340)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/condense.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">condense.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 12F · 15I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 340)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/dep_guard.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">dep_guard.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 8F · 12I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 340)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/diagram_generator.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">diagram_generator.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 4F · 13I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 480)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/gatekeeper.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">gatekeeper.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">3C · 20F · 17I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 480)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/invariant_store.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">invariant_store.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 9F · 12I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 480)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/self_heal.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">self_heal.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 2F · 9I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 620)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/ste_engine.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">ste_engine.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 4F · 10I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 620)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/studio.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">studio.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 6F · 9I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 620)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">scripts/vibe_synthesizer.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">vibe_synthesizer.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 4F · 11I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 760)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">showcase/apex_vault.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">apex_vault.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">7C · 18F · 14I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 760)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">showcase/demo.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">demo.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 2F · 9I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 760)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">showcase/__init__.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">__init__.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">0C · 0F · 4I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 900)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_amnesia_benchmark.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_amnesia_benchmark.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">3C · 17F · 13I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 900)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_apex_cli.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_apex_cli.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 7F · 6I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 900)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_benchmarks.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_benchmarks.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 3F · 6I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 1040)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_blast_analyzer.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_blast_analyzer.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 5F · 9I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 1040)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_condenser.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_condenser.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 12F · 8I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 1040)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_dep_guard.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_dep_guard.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 5F · 6I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 1180)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_diagram_generator.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_diagram_generator.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 4F · 7I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 1180)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_e2e_simulation.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_e2e_simulation.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 5F · 8I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 1180)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_gatekeeper.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_gatekeeper.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 5F · 8I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 1320)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_polyglot.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_polyglot.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 7F · 14I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 1320)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_reproducer_variable_amnesia.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_reproducer_variable_amnesia.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 4F · 11I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 1320)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_sast_complexity.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_sast_complexity.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 9F · 8I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 1460)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_self_heal.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_self_heal.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 6F · 6I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 1460)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_showcase.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_showcase.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">5C · 13F · 11I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 1460)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_skill_purity.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_skill_purity.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 13F · 5I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 1600)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_snapshot.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_snapshot.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 4F · 7I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 1600)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_ste_engine.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_ste_engine.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 5F · 6I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(650, 1600)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_studio.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_studio.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 4F · 11I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(50, 1740)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_templates.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_templates.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 3F · 2I</text>
+        </g>
+        
+        <g class="module-node" transform="translate(350, 1740)">
+            <rect width="250" height="90" rx="8" ry="8" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+            <rect width="250" height="26" rx="8" ry="8" fill="#21262d" />
+            <text x="12" y="18" fill="#58a6ff" font-family="sans-serif" font-size="12" font-weight="600">tests/test_vibe_synthesizer.py</text>
+            <text x="12" y="48" fill="#8b949e" font-family="monospace" font-size="11">test_vibe_synthesizer.py</text>
+            <text x="12" y="70" fill="#7ee787" font-family="monospace" font-size="10">1C · 4F · 6I</text>
+        </g>
+        </g>
+    </svg></div>
+    <div class="section-title">Cryptographic Invariant Registry</div>
+    <div class="inv-container"><div class="inv-empty">No invariants bound in .context/invariants.json. Use <code>apex bind</code> to pin.</div></div>
+    <footer>Standalone Artifact generated by <code>apex diagram</code> · 0 chat tokens consumed · Disk-only visual artifact</footer>
+</body>
+</html>

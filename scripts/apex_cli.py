@@ -24,6 +24,8 @@ import self_heal
 import studio
 import blast_analyzer
 import invariant_store
+import ste_engine
+import diagram_generator
 
 
 def main(argv=None) -> int:
@@ -137,6 +139,21 @@ def main(argv=None) -> int:
     cinv_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
     cinv_parser.add_argument("--json", action="store_true", help="Output violations in JSON format")
 
+    # 16. ste: ASD-STE100 Precision Linter & Step Normalizer
+    ste_parser = subparsers.add_parser("ste", help="Lint specification/prompts with 80%% ASD-STE100 precision or normalize steps")
+    ste_parser.add_argument("--file", help="File to lint")
+    ste_parser.add_argument("--text", help="Text string to lint")
+    ste_parser.add_argument("--step", help="Format a noisy procedural step into an active imperative command")
+    ste_parser.add_argument("--check", action="store_true", help="Exit code 1 if violations found")
+    ste_parser.add_argument("--json", action="store_true", help="Output violations as JSON")
+
+    # 17. diagram: Standalone HTML/SVG Architecture Visualizer
+    diag_parser = subparsers.add_parser("diagram", help="Generate standalone dark-mode HTML/SVG architecture HUD")
+    diag_parser.add_argument("--dir", default=".", help="Target directory (default: current dir)")
+    diag_parser.add_argument("--out", help="Output HTML file path (default: docs/architecture.html)")
+    diag_parser.add_argument("--open", action="store_true", help="Automatically open generated HTML in browser")
+    diag_parser.add_argument("--json", action="store_true", help="Output structural model as JSON")
+
     args = parser.parse_args(argv)
 
     if args.subcommand == "vibe":
@@ -216,6 +233,30 @@ def main(argv=None) -> int:
         if args.json:
             sub_argv.append("--json")
         return gatekeeper.main(sub_argv)
+
+    elif args.subcommand == "ste":
+        sub_argv = []
+        if args.file:
+            sub_argv.extend(["--file", args.file])
+        if args.text:
+            sub_argv.extend(["--text", args.text])
+        if args.step:
+            sub_argv.extend(["--step", args.step])
+        if args.check:
+            sub_argv.append("--check")
+        if args.json:
+            sub_argv.append("--json")
+        return ste_engine.main(sub_argv)
+
+    elif args.subcommand == "diagram":
+        sub_argv = ["--dir", args.dir]
+        if args.out:
+            sub_argv.extend(["--out", args.out])
+        if args.open:
+            sub_argv.append("--open")
+        if args.json:
+            sub_argv.append("--json")
+        return diagram_generator.main(sub_argv)
 
     return 0
 

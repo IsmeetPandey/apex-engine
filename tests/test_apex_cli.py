@@ -52,6 +52,29 @@ class TestApexCLI(unittest.TestCase):
         content = active_state.read_text(encoding="utf-8")
         self.assertIn("Completed database migration, next is API route", content)
 
+    def test_apex_ste_command(self):
+        res = subprocess.run(
+            ["python", self.cli_path, "ste", "--step", "You need to make sure that the cache size is set to 1024."],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Set cache size to 1024", res.stdout)
+
+    def test_apex_diagram_command(self):
+        out_html = os.path.join(self.test_dir, "docs", "arch.html")
+        res = subprocess.run(
+            ["python", self.cli_path, "diagram", "--dir", self.test_dir, "--out", out_html],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertTrue(os.path.isfile(out_html))
+        with open(out_html, "r", encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn("ApexEngine Architecture HUD", html)
+        self.assertIn("#0d1117", html)
+
 
 if __name__ == "__main__":
     unittest.main()

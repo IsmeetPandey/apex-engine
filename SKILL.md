@@ -259,6 +259,27 @@ apex bind BASELINE_SCORE 0.9465 --type float --immutable --desc "Ground truth ac
 apex check-invariants --dir .
 ```
 
+#### 9. 80% ASD-STE100 Precision Normalizer (`apex ste`)
+Enforces aerospace-grade precision in procedural instructions and planning steps. Eliminates conversational filler, AI slop, and passive voice while preserving unconstrained technical programming vocabulary:
+```bash
+# Normalize conversational step into active imperative command:
+apex ste --step "You need to make sure that the cache size is set to 1024."
+# Result: Set cache size to 1024.
+
+# Lint specification or plan for slop, passive voice, or sentences > 25 words:
+apex ste --file SPEC.md --check
+```
+
+#### 10. Standalone HTML Architecture Visualizer (`apex diagram`)
+Generates an interactive, dark-mode SVG/HTML visual architecture HUD saved strictly to disk (`docs/architecture.html`). Renders module dependency graphs, state machines, and cryptographic invariants with **zero tokens loaded into LLM conversation context**:
+```bash
+# Generate architecture HUD:
+apex diagram --dir . --out docs/architecture.html
+
+# Open in browser:
+apex diagram --dir . --open
+```
+
 ---
 
 ### Zero-Dependency Markdown Fallback
